@@ -1,4 +1,7 @@
 #include <spreadinterp.h>
+#include <tiledeval.h>
+#include <tiledinterp.h>
+#include <tiledspread.h>
 #include <dataTypes.h>
 #include <defs.h>
 #include <utils.h>
@@ -8,6 +11,7 @@
 #include <vector>
 #include <math.h>
 #include <stdio.h>
+
 using namespace std;
 
 // declarations of purely internal functions...
@@ -45,27 +49,11 @@ void get_subgrid(BIGINT &offset1,BIGINT &offset2,BIGINT &offset3,BIGINT &size1,
 		 FLT* kz0,int ns, int ndims);
 
 
-
-/* local NU coord fold+rescale macro: does the following affine transform to x:
-     when p=true:   map [-3pi,-pi) and [-pi,pi) and [pi,3pi)    each to [0,N)
-     otherwise,     map [-N,0) and [0,N) and [N,2N)             each to [0,N)
-   Thus, only one period either side of the principal domain is folded.
-   (It is *so* much faster than slow std::fmod that we stick to it.)
-   This explains FINUFFT's allowed input domain of [-3pi,3pi).
-   Speed comparisons of this macro vs a function are in devel/foldrescale*.
-   The macro wins hands-down on i7, even for modern GCC9.
-*/
-#define FOLDRESCALE(x,N,p) (p ?                                         \
-         (x + (x>=-PI ? (x<PI ? PI : -PI) : 3*PI)) * ((FLT)M_1_2PI*N) : \
-                        (x>=0.0 ? (x<(FLT)N ? x : x-(FLT)N) : x+(FLT)N))
-
-
-
 // ==========================================================================
 int spreadinterp(
         BIGINT N1, BIGINT N2, BIGINT N3, FLT *data_uniform,
         BIGINT M, FLT *kx, FLT *ky, FLT *kz, FLT *data_nonuniform,
-        spread_opts opts)
+        const spread_opts& opts)
 /* ------------Spreader/interpolator for 1, 2, or 3 dimensions --------------
    If opts.spread_direction=1, evaluate, in the 1D case,
 
@@ -147,7 +135,7 @@ int spreadinterp(
     return ERR_SPREAD_ALLOC;
   }
   int did_sort = indexSort(sort_indices, N1, N2, N3, M, kx, ky, kz, opts);
-  spreadinterpSorted(sort_indices, N1, N2, N3, data_uniform,
+  opts.spreadinterpFunc(sort_indices, N1, N2, N3, data_uniform,
                      M, kx, ky, kz, data_nonuniform, opts, did_sort);
   free(sort_indices);
   return 0;
@@ -165,7 +153,7 @@ static int ndims_from_Ns(BIGINT N1, BIGINT N2, BIGINT N3)
 }
 
 int spreadcheck(BIGINT N1, BIGINT N2, BIGINT N3, BIGINT M, FLT *kx, FLT *ky,
-                FLT *kz, spread_opts opts)
+                FLT *kz, const spread_opts& opts)
 /* This does just the input checking and reporting for the spreader.
    See spreadinterp() for input arguments and meaning of returned value.
    Split out by Melody Shih, Jun 2018. Finiteness chk Barnett 7/30/18.
@@ -218,7 +206,7 @@ int spreadcheck(BIGINT N1, BIGINT N2, BIGINT N3, BIGINT M, FLT *kx, FLT *ky,
 
 
 int indexSort(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3, BIGINT M, 
-               FLT *kx, FLT *ky, FLT *kz, spread_opts opts)
+               FLT *kx, FLT *ky, FLT *kz, const spread_opts& opts)
 /* This makes a decision whether or not to sort the NU pts (influenced by
    opts.sort), and if yes, calls either single- or multi-threaded bin sort,
    writing reordered index list to sort_indices. If decided not to sort, the
@@ -287,7 +275,7 @@ int indexSort(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3, BIGINT M,
 
 int spreadinterpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3, 
 		      FLT *data_uniform, BIGINT M, FLT *kx, FLT *ky, FLT *kz,
-		      FLT *data_nonuniform, spread_opts opts, int did_sort)
+		      FLT *data_nonuniform, const spread_opts& opts, int did_sort)
 /* Logic to select the main spreading (dir=1) vs interpolation (dir=2) routine.
    See spreadinterp() above for inputs arguments and definitions.
    Return value should always be 0 (no error reporting).
@@ -307,7 +295,7 @@ int spreadinterpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 // --------------------------------------------------------------------------
 int spreadSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3, 
 		      FLT *data_uniform,BIGINT M, FLT *kx, FLT *ky, FLT *kz,
-		      FLT *data_nonuniform, spread_opts opts, int did_sort)
+		      FLT *data_nonuniform, const spread_opts& opts, int did_sort)
 // Spread NU pts in sorted order to a uniform grid. See spreadinterp() for doc.
 {
   CNTime timer;
@@ -419,7 +407,7 @@ int spreadSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3,
         if (N2>1) free(ky0);
         if (N3>1) free(kz0); 
       }     // end main loop over subprobs
-      if (opts.debug) printf("\tt1 fancy spread: \t%.3g s (%lld subprobs)\n",timer.elapsedsec(), nb);
+      if (opts.debug) printf("\tt1 fancy spread: \t%.3g s (%ld subprobs)\n",timer.elapsedsec(), nb);
     }   // end of choice of which t1 spread type to use
     return 0;
 };
@@ -428,7 +416,7 @@ int spreadSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3,
 // --------------------------------------------------------------------------
 int interpSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3, 
 		      FLT *data_uniform,BIGINT M, FLT *kx, FLT *ky, FLT *kz,
-		      FLT *data_nonuniform, spread_opts opts, int did_sort)
+		      FLT *data_nonuniform, const spread_opts& opts, int did_sort)
 // Interpolate to NU pts in sorted order from a uniform grid.
 // See spreadinterp() for doc.
 {
@@ -536,8 +524,6 @@ int interpSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3,
   return 0;
 };
 
-
-
 ///////////////////////////////////////////////////////////////////////////
 
 int setup_spreader(spread_opts &opts, FLT eps, double upsampfac,
@@ -622,10 +608,62 @@ int setup_spreader(spread_opts &opts, FLT eps, double upsampfac,
     betaoverns = gamma*PI*(1.0-1.0/(2*upsampfac));  // formula based on cutoff
   }
   opts.ES_beta = betaoverns * (FLT)ns;    // set the kernel beta parameter
+
+  opts.spreadinterpFunc = spreadinterpSorted;
+
   if (debug)
     printf("%s (kerevalmeth=%d) eps=%.3g sigma=%.3g: chose ns=%d beta=%.3g\n",__func__,kerevalmeth,(double)eps,upsampfac,ns,(double)opts.ES_beta);
   
   return ier;
+}
+
+int optimize_spreader(FINUFFT_PLAN p)
+{
+    if (p->spopts.upsampfac == 2.0) {
+        if (p->spopts.spread_direction == 1) {  // ========= direction 1 (spreading) =======
+            switch (p->dim) {
+            case 1:
+                break;
+            case 2:
+                break;
+            case 3:
+                switch (p->spopts.nspread) {
+                case 7:
+                    p->spopts.spreadinterpFunc = tiled_spreadSorted<3, 7, true>;
+                    break;
+                }
+                break;
+            }
+        }
+        else {           // ================= direction 2 (interpolation) ===========
+            switch (p->dim) {
+            case 1:
+                switch (p->spopts.nspread) {
+                case 7:
+                    p->spopts.spreadinterpFunc = tiled_interpSorted<1, 7, true>;
+                    break;
+                }
+                break;
+            case 2:
+                break;
+            case 3:
+                switch (p->spopts.nspread) {
+                case 7:
+                    p->spopts.spreadinterpFunc = tiled_interpSorted<3, 7, true>;
+                    break;
+                }
+                break;
+            }
+        }
+    }
+    else if (p->spopts.upsampfac == 1.25) {
+
+    }
+    else {
+        fprintf(stderr, "%s: unknown upsampfac, failed!\n", __func__);
+    }
+
+    return 0;
 }
 
 FLT evaluate_kernel(FLT x, const spread_opts &opts)

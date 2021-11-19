@@ -6,6 +6,7 @@
 #define SPREADINTERP_H
 
 #include <dataTypes.h>
+#include <finufft_plan_eitherprec.h>
 #include <spread_opts.h>
 
 /* Bitwise debugging timing flag (TF) definitions; see spread_opts.flags.
@@ -26,22 +27,23 @@
 // things external (spreadinterp) interface needs...
 int spreadinterp(BIGINT N1, BIGINT N2, BIGINT N3, FLT *data_uniform,
 		 BIGINT M, FLT *kx, FLT *ky, FLT *kz,
-		 FLT *data_nonuniform, spread_opts opts);
+		 FLT *data_nonuniform, const spread_opts& opts);
 int spreadcheck(BIGINT N1, BIGINT N2, BIGINT N3,
-                 BIGINT M, FLT *kx, FLT *ky, FLT *kz, spread_opts opts);
+                 BIGINT M, FLT *kx, FLT *ky, FLT *kz, const spread_opts& opts);
 int indexSort(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3, BIGINT M, 
-               FLT *kx, FLT *ky, FLT *kz, spread_opts opts);
+               FLT *kx, FLT *ky, FLT *kz, const spread_opts& opts);
 int interpSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3, 
 		      FLT *data_uniform,BIGINT M, FLT *kx, FLT *ky, FLT *kz,
-		 FLT *data_nonuniform, spread_opts opts, int did_sort);
+		 FLT *data_nonuniform, const spread_opts& opts, int did_sort);
 int spreadSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3, 
 		      FLT *data_uniform,BIGINT M, FLT *kx, FLT *ky, FLT *kz,
-		 FLT *data_nonuniform, spread_opts opts, int did_sort);
+		 FLT *data_nonuniform, const spread_opts& opts, int did_sort);
 int spreadinterpSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3, 
 		      FLT *data_uniform,BIGINT M, FLT *kx, FLT *ky, FLT *kz,
-		      FLT *data_nonuniform, spread_opts opts, int did_sort);
+		      FLT *data_nonuniform, const spread_opts& opts, int did_sort);
 FLT evaluate_kernel(FLT x,const spread_opts &opts);
 FLT evaluate_kernel_noexp(FLT x,const spread_opts &opts);
 int setup_spreader(spread_opts &opts,FLT eps,double upsampfac,int kerevalmeth, int debug, int showwarn, int dim);
+int optimize_spreader(FINUFFT_PLAN p);
 
 #endif  // SPREADINTERP_H

@@ -3,6 +3,8 @@
 
 #include <dataTypes.h>
 
+constexpr int npipes = 8;   // # of the parallel data pipes
+
 // C-compatible options struct for spreader.
 // (mostly internal to spreadinterp.cpp, with a little bleed to finufft.cpp)
 
@@ -28,6 +30,11 @@ typedef struct spread_opts {  // see spreadinterp:setup_spreader for defaults.
   FLT ES_beta;
   FLT ES_halfwidth;
   FLT ES_c;
+
+  int (*spreadinterpFunc)(BIGINT*, BIGINT, BIGINT, BIGINT,
+	  FLT*, BIGINT, FLT*, FLT*, FLT*,
+	  FLT*, const spread_opts&, int);
+
 } spread_opts;
 
 #endif   // SPREAD_OPTS_H
