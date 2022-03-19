@@ -12,18 +12,26 @@ int main()
   double tol = 1e-5;         // req tol, covers both single & double prec cases
   int isign = +1;            // exponential sign for NUFFT
   static const CPX I = CPX(0.0,1.0);  // imaginary unit. Note: avoid (CPX) cast
-  std::vector<CPX> F(N);     // alloc output mode coeffs
+
 
   // Make the input data....................................
-  srand(42);                 // seed
-  std::vector<FLT> x(M);     // NU pts locs
-  std::vector<CPX> c(M);     // strengths 
-  for (BIGINT j=0; j<M; ++j) {
-    x[j] = M_PI*(2*((FLT)rand()/RAND_MAX)-1);     // uniform random in [-pi,pi)
-    c[j] = 2*((FLT)rand()/RAND_MAX)-1 + I*(2*((FLT)rand()/RAND_MAX)-1);
-  }
+  // initialize RNG
+  VSLStreamStatePtr stream;
+  int errcode = vslNewStream(&stream, VSL_BRNG_SFMT19937, 111);
+
+
+  FLT* x = (FLT*)scalable_aligned_malloc(sizeof(FLT) * M, 64);        // NU pts
+  CPX* c = (CPX*)scalable_aligned_malloc(sizeof(CPX) * M, 64);   // strengths 
+  CPX* F = (CPX*)scalable_aligned_malloc(sizeof(CPX) * N, 64);   // mode ampls
+
+  // fill x with [-pi,pi)
+  errcode = vxRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, M, x, -M_PI, M_PI);
+
+  // fill c with [-1.0,1.0)
+  errcode = vxRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, 2 * M, reinterpret_cast<FLT*>(c), -1.0, 1.0);
+
   // Run it (NULL = default opts) .......................................
-  int ier = FINUFFT1D1(M,&x[0],&c[0],isign,tol,N,&F[0],NULL);
+  int ier = FINUFFT1D1(M,x,c,isign,tol,N,F,NULL);
   if (ier!=0) {
     printf("basicpassfail: finufft1d1 error (ier=%d)!",ier);
     exit(ier);
@@ -40,6 +48,7 @@ int main()
     if (aF>Finfnrm) Finfnrm=aF;
   }
   FLT relerr = abs(F[nout] - Ftest)/Finfnrm;
-  //printf("requested tol %.3g: rel err for one mode %.3g\n",tol,relerr);
+  printf("requested tol %.3g: rel err for one mode %.3g\n",tol,relerr);
+  scalable_aligned_free(x); scalable_aligned_free(c); scalable_aligned_free(F);
   return (std::isnan(relerr) || relerr > 10.0*tol);    // true reports failure
 }

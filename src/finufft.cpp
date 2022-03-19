@@ -7,6 +7,7 @@
 #include <utils_precindep.h>
 #include <spreadinterp.h>
 #include <fftw_defs.h>
+#include <onedim_fseries_kernel.h>
 
 #include <iostream>
 #include <iomanip>
@@ -17,6 +18,10 @@
 extern "C" {
   #include "../contrib/legendre_rule_fast.h"
 }
+
+#include <tbb/tbb.h>
+#include <tbb/scalable_allocator.h>
+
 using namespace std;
 
 
@@ -162,66 +167,6 @@ void set_nhg_type3(FLT S, FLT X, nufft_opts opts, spread_opts spopts,
     *nf = next235even(*nf);                   // expensive at huge nf
   *h = 2*PI / *nf;                            // upsampled grid spacing
   *gam = (FLT)*nf / (2.0*opts.upsampfac*Ssafe);  // x scale fac to x'
-}
-
-void onedim_fseries_kernel(BIGINT nf, FLT *fwkerhalf, spread_opts opts)
-/*
-  Approximates exact Fourier series coeffs of cnufftspread's real symmetric
-  kernel, directly via q-node quadrature on Euler-Fourier formula, exploiting
-  narrowness of kernel. Uses phase winding for cheap eval on the regular freq
-  grid. Note that this is also the Fourier transform of the non-periodized
-  kernel. The FT definition is f(k) = int e^{-ikx} f(x) dx. The output has an
-  overall prefactor of 1/h, which is needed anyway for the correction, and
-  arises because the quadrature weights are scaled for grid units not x units.
-
-  Inputs:
-  nf - size of 1d uniform spread grid, must be even.
-  opts - spreading opts object, needed to eval kernel (must be already set up)
-
-  Outputs:
-  fwkerhalf - real Fourier series coeffs from indices 0 to nf/2 inclusive,
-              divided by h = 2pi/n.
-              (should be allocated for at least nf/2+1 FLTs)
-
-  Compare onedim_dct_kernel which has same interface, but computes DFT of
-  sampled kernel, not quite the same object.
-
-  Barnett 2/7/17. openmp (since slow vs fftw in 1D large-N case) 3/3/18.
-  Fixed num_threads 7/20/20
- */
-{
-  FLT J2 = opts.nspread/2.0;            // J/2, half-width of ker z-support
-  // # quadr nodes in z (from 0 to J/2; reflections will be added)...
-  int q=(int)(2 + 3.0*J2);  // not sure why so large? cannot exceed MAX_NQUAD
-  FLT f[MAX_NQUAD];
-  double z[2*MAX_NQUAD], w[2*MAX_NQUAD];
-  legendre_compute_glr(2*q,z,w);        // only half the nodes used, eg on (0,1)
-  std::complex<FLT> a[MAX_NQUAD];
-  for (int n=0;n<q;++n) {               // set up nodes z_n and vals f_n
-    z[n] *= J2;                         // rescale nodes
-    f[n] = J2*(FLT)w[n] * evaluate_kernel((FLT)z[n], opts); // vals & quadr wei
-    a[n] = exp(2*PI*IMA*(FLT)(nf/2-z[n])/(FLT)nf);  // phase winding rates
-  }
-  BIGINT nout=nf/2+1;                   // how many values we're writing to
-  int nt = min(nout,(BIGINT)opts.nthreads);         // how many chunks
-  std::vector<BIGINT> brk(nt+1);        // start indices for each thread
-  for (int t=0; t<=nt; ++t)             // split nout mode indices btw threads
-    brk[t] = (BIGINT)(0.5 + nout*t/(double)nt);
-#pragma omp parallel num_threads(nt)
-  {                                     // each thread gets own chunk to do
-    int t = MY_OMP_GET_THREAD_NUM();
-    std::complex<FLT> aj[MAX_NQUAD];    // phase rotator for this thread
-    for (int n=0;n<q;++n)
-      aj[n] = pow(a[n],(FLT)brk[t]);    // init phase factors for chunk
-    for (BIGINT j=brk[t];j<brk[t+1];++j) {          // loop along output array
-      FLT x = 0.0;                      // accumulator for answer at this j
-      for (int n=0;n<q;++n) {
-        x += f[n] * 2*real(aj[n]);      // include the negative freq
-        aj[n] *= a[n];                  // wind the phases
-      }
-      fwkerhalf[j] = x;
-    }
-  }
 }
 
 void onedim_nuft_kernel(BIGINT nk, FLT *k, FLT *phihat, spread_opts opts)
@@ -658,16 +603,16 @@ int FINUFFT_MAKEPLAN(int type, int dim, BIGINT* n_modes, int iflag,
     // determine fine grid sizes, sanity check..
     int nfier = SET_NF_TYPE12(p->ms, p->opts, p->spopts, &(p->nf1));
     if (nfier) return nfier;    // nf too big; we're done
-    p->phiHat1 = (FLT*)malloc(sizeof(FLT)*(p->nf1/2 + 1));
+    p->phiHat1 = (FLT*)scalable_aligned_malloc(sizeof(FLT)*(p->nf1/2 + 1), 64);
     if (dim > 1) {
       nfier = SET_NF_TYPE12(p->mt, p->opts, p->spopts, &(p->nf2));
       if (nfier) return nfier;
-      p->phiHat2 = (FLT*)malloc(sizeof(FLT)*(p->nf2/2 + 1));
+      p->phiHat2 = (FLT*)scalable_aligned_malloc(sizeof(FLT)*(p->nf2/2 + 1), 64);
     }
     if (dim > 2) {
       nfier = SET_NF_TYPE12(p->mu, p->opts, p->spopts, &(p->nf3)); 
       if (nfier) return nfier;
-      p->phiHat3 = (FLT*)malloc(sizeof(FLT)*(p->nf3/2 + 1));
+      p->phiHat3 = (FLT*)scalable_aligned_malloc(sizeof(FLT)*(p->nf3/2 + 1), 64);
     }
 
     if (p->opts.debug) { // "long long" here is to avoid warnings with printf...
@@ -683,9 +628,9 @@ int FINUFFT_MAKEPLAN(int type, int dim, BIGINT* n_modes, int iflag,
 
     // STEP 0: get Fourier coeffs of spreading kernel along each fine grid dim
     CNTime timer; timer.start();
-    onedim_fseries_kernel(p->nf1, p->phiHat1, p->spopts);
-    if (dim>1) onedim_fseries_kernel(p->nf2, p->phiHat2, p->spopts);
-    if (dim>2) onedim_fseries_kernel(p->nf3, p->phiHat3, p->spopts);
+    onedim_fseries_kernel<FLT>(p->nf1, p->phiHat1, p->spopts);
+    if (dim>1) onedim_fseries_kernel<FLT>(p->nf2, p->phiHat2, p->spopts);
+    if (dim>2) onedim_fseries_kernel<FLT>(p->nf3, p->phiHat3, p->spopts);
     if (p->opts.debug) printf("[%s] kernel fser (ns=%d):\t\t%.3g s\n",__func__,p->spopts.nspread, timer.elapsedsec());
 
     timer.restart();
@@ -698,7 +643,7 @@ int FINUFFT_MAKEPLAN(int type, int dim, BIGINT* n_modes, int iflag,
     if (p->opts.debug) printf("[%s] fwBatch %.2fGB alloc:   \t%.3g s\n", __func__,(double)1E-09*sizeof(CPX)*p->nf*p->batchSize, timer.elapsedsec());
     if(!p->fwBatch) {      // we don't catch all such mallocs, just this big one
       fprintf(stderr, "[%s] FFTW malloc failed for fwBatch (working fine grids)!\n",__func__);
-      free(p->phiHat1); free(p->phiHat2); free(p->phiHat3);
+      scalable_aligned_free(p->phiHat1); scalable_aligned_free(p->phiHat2); scalable_aligned_free(p->phiHat3);
       return ERR_ALLOC;
     }
    
@@ -750,7 +695,7 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
     if (ier)         // no warnings allowed here
       return ier;    
     timer.restart();
-    p->sortIndices = (BIGINT *)malloc(sizeof(BIGINT)*p->nj);
+    p->sortIndices = (BIGINT *)scalable_aligned_malloc(sizeof(BIGINT)*p->nj, 64);
     if (!p->sortIndices) {
       fprintf(stderr,"[%s] failed to allocate sortIndices!\n",__func__);
       return ERR_SPREAD_ALLOC;
@@ -805,7 +750,7 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
     }
     p->fwBatch = FFTW_ALLOC_CPX(p->nf * p->batchSize);    // maybe big workspace
     // (note FFTW_ALLOC is not needed over malloc, but matches its type)
-    p->CpBatch = (CPX*)malloc(sizeof(CPX) * nj*p->batchSize);  // batch c' work
+    p->CpBatch = (CPX*)scalable_aligned_malloc(sizeof(CPX) * nj*p->batchSize, 64);  // batch c' work
     if (p->opts.debug) printf("[%s t3] widcen, batch %.2fGB alloc:\t%.3g s\n", __func__, (double)1E-09*sizeof(CPX)*(p->nf+nj)*p->batchSize, timer.elapsedsec());
     if(!p->fwBatch || !p->CpBatch) {
       fprintf(stderr, "[%s t3] malloc fail for fwBatch or CpBatch!\n",__func__);
@@ -814,15 +759,19 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
     //printf("fwbatch, cpbatch ptrs: %llx %llx\n",p->fwBatch,p->CpBatch);
 
     // alloc rescaled NU src pts x'_j (in X etc), rescaled NU targ pts s'_k ...
-    p->X = (FLT*)malloc(sizeof(FLT)*nj);
-    p->Sp = (FLT*)malloc(sizeof(FLT)*nk);
-    if (d>1) {
-      p->Y = (FLT*)malloc(sizeof(FLT)*nj);
-      p->Tp = (FLT*)malloc(sizeof(FLT)*nk);
-    }
-    if (d>2) {
-      p->Z = (FLT*)malloc(sizeof(FLT)*nj);
-      p->Up = (FLT*)malloc(sizeof(FLT)*nk);
+    switch (d) {
+    case 3:
+        p->Z = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nj, 64);
+        p->Up = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nk, 64);
+        // fall through
+    case 2:
+        p->Y = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nj, 64);
+        p->Tp = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nk, 64);
+        // fall through
+    case 1:
+        p->X = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nj, 64);
+        p->Sp = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nk, 64);
+        break;
     }
 
     // always shift as use gam to rescale x_j to x'_j, etc (twist iii)...
@@ -842,7 +791,7 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
 
     // set up prephase array...
     CPX imasign = (p->fftSign>=0) ? IMA : -IMA;             // +-i
-    p->prephase = (CPX*)malloc(sizeof(CPX)*nj);
+    p->prephase = (CPX*)scalable_aligned_malloc(sizeof(CPX)*nj, 64);
     if (p->t3P.D1!=0.0 || p->t3P.D2!=0.0 || p->t3P.D3!=0.0) {
 #pragma omp parallel for num_threads(p->opts.nthreads) schedule(static)
       for (BIGINT j=0;j<nj;++j) {          // ... loop over src NU locs
@@ -869,16 +818,16 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
     
     // (old STEP 3a) Compute deconvolution post-factors array (per targ pt)...
     // (exploits that FT separates because kernel is prod of 1D funcs)
-    p->deconv = (CPX*)malloc(sizeof(CPX)*nk);
-    FLT *phiHatk1 = (FLT*)malloc(sizeof(FLT)*nk);  // don't confuse w/ p->phiHat
+    p->deconv = (CPX*)scalable_aligned_malloc(sizeof(CPX)*nk, 64);
+    FLT *phiHatk1 = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nk, 64);  // don't confuse w/ p->phiHat
     onedim_nuft_kernel(nk, p->Sp, phiHatk1, p->spopts);         // fill phiHat1
     FLT *phiHatk2 = NULL, *phiHatk3 = NULL;
     if (d>1) {
-      phiHatk2 = (FLT*)malloc(sizeof(FLT)*nk);
+      phiHatk2 = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nk, 64);
       onedim_nuft_kernel(nk, p->Tp, phiHatk2, p->spopts);       // fill phiHat2
     }
     if (d>2) {
-      phiHatk3 = (FLT*)malloc(sizeof(FLT)*nk);
+      phiHatk3 = (FLT*)scalable_aligned_malloc(sizeof(FLT)*nk, 64);
       onedim_nuft_kernel(nk, p->Up, phiHatk3, p->spopts);       // fill phiHat3
     }
     int Cfinite = isfinite(p->t3P.C1) && isfinite(p->t3P.C2) && isfinite(p->t3P.C3);    // C can be nan or inf if M=0, no input NU pts
@@ -900,12 +849,12 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
         p->deconv[k] *= cos(phase)+imasign*sin(phase);   // Euler e^{+-i.phase}
       }
     }
-    free(phiHatk1); free(phiHatk2); free(phiHatk3);  // done w/ deconv fill
+    scalable_aligned_free(phiHatk1); scalable_aligned_free(phiHatk2); scalable_aligned_free(phiHatk3);  // done w/ deconv fill
     if (p->opts.debug) printf("[%s t3] phase & deconv factors:\t%.3g s\n",__func__,timer.elapsedsec());
 
     // Set up sort for spreading Cp (from primed NU src pts X, Y, Z) to fw...
     timer.restart();
-    p->sortIndices = (BIGINT *)malloc(sizeof(BIGINT)*p->nj);
+    p->sortIndices = (BIGINT *)scalable_aligned_malloc(sizeof(BIGINT)*p->nj, 64);
     if (!p->sortIndices) {
       fprintf(stderr,"[%s t3] failed to allocate sortIndices!\n",__func__);
       return ERR_SPREAD_ALLOC;
@@ -1090,20 +1039,20 @@ int FINUFFT_DESTROY(FINUFFT_PLAN p)
   if (!p)                // NULL ptr, so not a ptr to a plan, report error
     return 1;
   FFTW_FR(p->fwBatch);   // free the big FFTW (or t3 spread) working array
-  free(p->sortIndices);
+  scalable_aligned_free(p->sortIndices);
   if (p->type==1 || p->type==2) {
     FFTW_DE(p->fftwPlan);
-    free(p->phiHat1);
-    free(p->phiHat2);
-    free(p->phiHat3);
+    scalable_aligned_free(p->phiHat1);
+    scalable_aligned_free(p->phiHat2);
+    scalable_aligned_free(p->phiHat3);
   } else {               // free the stuff alloc for type 3 only
     FINUFFT_DESTROY(p->innerT2plan);   // if NULL, ignore its error code
-    free(p->CpBatch);
-    free(p->Sp); free(p->Tp); free(p->Up);
-    free(p->X); free(p->Y); free(p->Z);
-    free(p->prephase);
-    free(p->deconv);
+    scalable_aligned_free(p->CpBatch);
+    scalable_aligned_free(p->Sp); scalable_aligned_free(p->Tp); scalable_aligned_free(p->Up);
+    scalable_aligned_free(p->X); scalable_aligned_free(p->Y); scalable_aligned_free(p->Z);
+    scalable_aligned_free(p->prephase);
+    scalable_aligned_free(p->deconv);
   }
-  free(p);
+  delete p;
   return 0;              // success
 }

@@ -63,20 +63,26 @@ int main(int argc, char* argv[])
   printf("1D dumb cases ----------------\n");
   int ier = FINUFFT1D1(M,x,c,+1,0,N,F,&opts);
   printf("1d1 tol=0:\tier=%d (should complain)\n",ier);
+  assert(ier == 1);
   ier = FINUFFT1D1(M,x,c,+1,acc,0,F,&opts);
   printf("1d1 N=0:\tier=%d\n",ier);
+  assert(ier == 0);
   ier = FINUFFT1D1(0,x,c,+1,acc,N,F,&opts);
   printf("1d1 M=0:\tier=%d\tnrm(F)=%.3g (should vanish)\n",ier,twonorm(N,F));
+  assert(ier == 5);
   FLT xsave = x[0];
   x[0] = 3*PI*(1 + 2*EPSILON);   // works in either prec, just outside valid
   ier = FINUFFT1D1(M,x,c,+1,acc,N,F,&opts);
   printf("1d1 x>3pi:\tier=%d (should complain)\n",ier);
+  assert(ier == 4);
   x[0] = INFINITY;
   ier = FINUFFT1D1(M,x,c,+1,acc,N,F,&opts);
   printf("1d1 x=Inf:\tier=%d (should complain)\n",ier);
+  assert(ier == 4);
   x[0] = NAN;
   ier = FINUFFT1D1(M,x,c,+1,acc,N,F,&opts);
   printf("1d1 x=NaN:\tier=%d (should complain)\n",ier);
+  assert(ier == 4);
   x[0] = xsave;
   
   for (int k=0; k<NN; ++k) F[k] = sin((FLT)0.7*k) + IMA*cos((FLT)0.3*k);  // set F for t2

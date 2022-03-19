@@ -15,8 +15,8 @@
 # Windows compatibility, jonas-kr, Sep '20.
 
 # Compiler (CXX), and linking from C, fortran. We use GCC by default...
-CXX = g++
-CC = gcc
+CXX = icc
+CC = icc
 FC = gfortran
 CLINK = -lstdc++
 FLINK = $(CLINK)
@@ -35,7 +35,7 @@ CXXFLAGS := $(CFLAGS)
 FFTWNAME = fftw3
 # linux default is fftw3_omp, since 10% faster than fftw3_threads...
 FFTWOMPSUFFIX = omp
-LIBS := -lm
+LIBS :=  -L${MKLROOT}/lib/intel64 -ltbb -ltbbmalloc -lmkl_core -lmkl_intel_lp64 -lm
 # multithreading for GCC: C++/C/Fortran, MATLAB, and octave (ICC differs)...
 OMPFLAGS = -fopenmp
 OMPLIBS = -lgomp
@@ -61,15 +61,11 @@ FINUFFT = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 # Now come flags that should be added, whatever user overrode in make.inc.
 # -fPIC (position-indep code) needed to build dyn lib (.so)
 # Also, we force return (via :=) to the land of simply-expanded variables...
-INCL = -Iinclude
-CXXFLAGS := $(CXXFLAGS) $(INCL) -fPIC -std=c++14
+INCL = -DMKL_ILP64  -I"${MKLROOT}/include" -I"${MKLROOT}/include/fftw" -Iinclude
+CXXFLAGS := $(CXXFLAGS) $(INCL) -fPIC -std=c++17
 CFLAGS := $(CFLAGS) $(INCL) -fPIC
 # here /usr/include needed for fftw3.f "fortran header"...
 FFLAGS := $(FFLAGS) $(INCL) -I/usr/include -fPIC
-
-# single-thread total list of math and FFTW libs (now both precisions)...
-# (Note: finufft tests use LIBSFFT; spread & util tests only need LIBS)
-LIBSFFT := -l$(FFTWNAME) -l$(FFTWNAME)f $(LIBS)
 
 # multi-threaded libs & flags, and req'd flags (OO for new interface)...
 ifneq ($(OMP),OFF)
@@ -78,13 +74,9 @@ ifneq ($(OMP),OFF)
   FFLAGS += $(OMPFLAGS)
   MFLAGS += $(MOMPFLAGS) -DR2008OO
   OFLAGS += $(OOMPFLAGS) -DR2008OO
-  LIBS += $(OMPLIBS)
-  ifneq ($(MINGW),ON)
-    ifneq ($(MSYS),ON)
-# omp override for total list of math and FFTW libs (now both precisions)...
-      LIBSFFT := -l$(FFTWNAME) -l$(FFTWNAME)_$(FFTWOMPSUFFIX) -l$(FFTWNAME)f -l$(FFTWNAME)f_$(FFTWOMPSUFFIX) $(LIBS)
-    endif
-  endif
+  LIBS += $(OMPLIBS) -lmkl_intel_thread
+else
+  LIBS += -lmkl_sequential
 endif
 
 # name & location of library we're building...
@@ -96,11 +88,11 @@ ABSDYNLIB = $(FINUFFT)$(DYNLIB)
 
 # spreader is subset of the library with self-contained testing, hence own objs:
 # double-prec spreader object files that also need single precision...
-SOBJS = src/spreadinterp.o src/utils.o
+SOBJS = src/spreadinterp.o src/eval_kernel.o src/utils.o
 # their single-prec versions
 SOBJSF = $(SOBJS:%.o=%_32.o)
 # precision-dependent spreader object files (compiled & linked only once)...
-SOBJS_PI = src/utils_precindep.o
+SOBJS_PI = src/utils_precindep.o src/subgrid.o
 # spreader dual-precision objs
 SOBJSD = $(SOBJS) $(SOBJSF) $(SOBJS_PI)
 
@@ -176,14 +168,14 @@ endif
 $(DYNLIB): $(OBJSD)
 # using *absolute* path in the -o here is needed to make portable executables
 # when compiled against it, in mac OSX, strangely...
-	$(CXX) -shared $(OMPFLAGS) $(OBJSD) -o $(ABSDYNLIB) $(LIBSFFT)
+	$(CXX) -shared $(OMPFLAGS) $(OBJSD) -o $(ABSDYNLIB) $(LIBS)
 ifeq ($(OMP),OFF)
 	@echo "$(DYNLIB) built, single-thread version"
 else
 	@echo "$(DYNLIB) built, multithreaded version"
 endif
 
-# here $(OMPFLAGS) and $(LIBSFFT) is even needed for linking under mac osx.
+# here $(OMPFLAGS) and $(LIBS) is even needed for linking under mac osx.
 # see: http://www.cprogramming.com/tutorial/shared-libraries-linux-gcc.html
 # Also note -l libs come after objects, as per modern GCC requirement.
 
@@ -216,9 +208,9 @@ endif
 examples/%: examples/%.o $(DYNLIB)
 	$(CXX) $(CXXFLAGS) $< $(ABSDYNLIB) -o $@
 examples/%c: examples/%c.o $(DYNLIB)
-	$(CC) $(CFLAGS) $< $(ABSDYNLIB) $(LIBSFFT) $(CLINK) -o $@
+	$(CC) $(CFLAGS) $< $(ABSDYNLIB) $(LIBS) $(CLINK) -o $@
 examples/%cf: examples/%cf.o $(DYNLIB)
-	$(CC) $(CFLAGS) $< $(ABSDYNLIB) $(LIBSFFT) $(CLINK) -o $@
+	$(CC) $(CFLAGS) $< $(ABSDYNLIB) $(LIBS) $(CLINK) -o $@
 
 
 # test (library validation) --------------------------------------------------
@@ -226,9 +218,9 @@ examples/%cf: examples/%cf.o $(DYNLIB)
 # Note: both precisions use same sources; single-prec executables get f suffix.
 # generic tests link against our .so... (other libs needed for fftw_forget...)
 test/%: test/%.cpp $(DYNLIB)
-	$(CXX) $(CXXFLAGS) $< $(ABSDYNLIB) $(LIBSFFT) -o $@
+	$(CXX) $(CXXFLAGS) $< $(ABSDYNLIB) $(LIBS) -o $@
 test/%f: test/%.cpp $(DYNLIB)
-	$(CXX) $(CXXFLAGS) -DSINGLE $< $(ABSDYNLIB) $(LIBSFFT) -o $@
+	$(CXX) $(CXXFLAGS) -DSINGLE $< $(ABSDYNLIB) $(LIBS) -o $@
 # low-level tests that are cleaner if depend on only specific objects...
 test/testutils: test/testutils.cpp src/utils.o src/utils_precindep.o
 	$(CXX) $(CXXFLAGS) test/testutils.cpp src/utils.o src/utils_precindep.o $(LIBS) -o test/testutils
@@ -269,9 +261,9 @@ endif
 # perftest (performance/developer tests) -------------------------------------
 # generic perf test rules...
 perftest/%: perftest/%.cpp $(DYNLIB)
-	$(CXX) $(CXXFLAGS) $< $(ABSDYNLIB) $(LIBSFFT) -o $@
+	$(CXX) $(CXXFLAGS) $< $(ABSDYNLIB) $(LIBS) -o $@
 perftest/%f: perftest/%.cpp $(DYNLIB)
-	$(CXX) $(CXXFLAGS) -DSINGLE $< $(ABSDYNLIB) $(LIBSFFT) -o $@
+	$(CXX) $(CXXFLAGS) -DSINGLE $< $(ABSDYNLIB) $(LIB) -o $@
 
 # spreader only test, double/single (good for self-contained work on spreader)
 ST=perftest/spreadtestnd
@@ -312,7 +304,7 @@ gurutime: $(GTT) $(GTTF)
 
 # This was for a CCQ application... (zgemm was 10x faster! double-prec only)
 perftest/manysmallprobs: perftest/manysmallprobs.cpp $(STATICLIB)
-	$(CXX) $(CXXFLAGS) $< $(STATICLIB) $(LIBSFFT) -o $@
+	$(CXX) $(CXXFLAGS) $< $(STATICLIB) $(LIBS) -o $@
 	@echo "manysmallprobs: single-thread..."
 	OMP_NUM_THREADS=1 $@
 
@@ -348,11 +340,11 @@ fortran: $(FE)
 # matlab ----------------------------------------------------------------------
 # matlab .mex* executable... (matlab is so slow to start, not worth testing it)
 matlab: matlab/finufft.cpp $(STATICLIB)
-	$(MEX) $< $(STATICLIB) $(INCL) $(MFLAGS) $(LIBSFFT) -output matlab/finufft
+	$(MEX) $< $(STATICLIB) $(INCL) $(MFLAGS) $(LIBS) -output matlab/finufft
 
 # octave .mex executable...
 octave: matlab/finufft.cpp $(STATICLIB)
-	(cd matlab; $(MKOCTFILE) --mex finufft.cpp -I../include ../$(STATICLIB) $(OFLAGS) $(LIBSFFT) -output finufft)
+	(cd matlab; $(MKOCTFILE) --mex finufft.cpp -I../include ../$(STATICLIB) $(OFLAGS) $(LIBS) -output finufft)
 	@echo "Running octave interface tests; please wait a few seconds..."
 	(cd matlab ;\
 	$(OCTAVE) test/check_finufft.m ;\

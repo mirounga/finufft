@@ -14,15 +14,26 @@
 // std stuff
 #include <math.h>
 #include <stdlib.h>
+#include <cassert>
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
 #include <vector>
+
+#include <tbb/tbb.h>
+#include <tbb/scalable_allocator.h>
+#include <mkl_vsl.h>
 
 // how big a problem to check direct DFT for in 1D...
 #define TEST_BIGPROB 1e8
 
 // for omp rand filling
 #define TEST_RANDCHUNK 1000000
+
+#ifdef SINGLE
+#define vxRngUniform vsRngUniform
+#else
+#define vxRngUniform vdRngUniform
+#endif
 
 #endif   // TEST_DEFS_H
