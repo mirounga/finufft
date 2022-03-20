@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
   printf("test 1d type 2:\n"); // -------------- type 2
 
   // fill F with [-1.0,1.0)
-  errcode = vxRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, 2 * M, reinterpret_cast<FLT*>(F), -1.0, 1.0);
+  errcode = vxRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, 2 * N, reinterpret_cast<FLT*>(F), -1.0, 1.0);
 
   timer.restart();
   ier = FINUFFT1D2(M,x,c,isign,tol,N,F,&opts);

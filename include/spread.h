@@ -113,6 +113,131 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 			pKer1 += nsPadded;
 		}
 		break;
+	case 12:
+		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			BIGINT si = sort_indices[i];
+			__m256d _dd0 = _mm256_permute4x64_pd(
+				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
+				0x44);
+
+			// offset rel to subgrid, starts the output indices
+			double* pDu = du + 2 * (i1[i] - off1);
+
+			__m256d _k0 = _mm256_load_pd(pKer1 + 0);
+			__m256d _k2 = _mm256_load_pd(pKer1 + 4);
+			__m256d _k4 = _mm256_load_pd(pKer1 + 8);
+
+			__m256d _kk0 = _mm256_permute4x64_pd(_k0, 0x50);
+			__m256d _kk1 = _mm256_permute4x64_pd(_k0, 0xfa);
+			__m256d _kk2 = _mm256_permute4x64_pd(_k2, 0x50);
+			__m256d _kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
+			__m256d _kk4 = _mm256_permute4x64_pd(_k4, 0x50);
+			__m256d _kk5 = _mm256_permute4x64_pd(_k4, 0xfa);
+
+			__m256d _du0 = _mm256_load_pd(pDu + 0);
+			__m256d _du1 = _mm256_load_pd(pDu + 4);
+			__m256d _du2 = _mm256_load_pd(pDu + 8);
+			__m256d _du3 = _mm256_load_pd(pDu + 12);
+			__m256d _du4 = _mm256_load_pd(pDu + 16);
+			__m256d _du5 = _mm256_load_pd(pDu + 20);
+
+			_du0 = _mm256_fmadd_pd(_dd0, _kk0, _du0);
+			_du1 = _mm256_fmadd_pd(_dd0, _kk1, _du1);
+			_du2 = _mm256_fmadd_pd(_dd0, _kk2, _du2);
+			_du3 = _mm256_fmadd_pd(_dd0, _kk3, _du3);
+			_du4 = _mm256_fmadd_pd(_dd0, _kk4, _du4);
+			_du5 = _mm256_fmadd_pd(_dd0, _kk5, _du5);
+
+#ifdef _MSC_VER
+			_mm256_store_pd(pDu + 0, _du0);
+			_mm256_store_pd(pDu + 4, _du1);
+			_mm256_store_pd(pDu + 8, _du2);
+			_mm256_store_pd(pDu + 12, _du3);
+			_mm256_store_pd(pDu + 16, _du4);
+			_mm256_store_pd(pDu + 20, _du5);
+#else
+			_mm256_storeu_pd(pDu + 0, _du0);
+			_mm256_storeu_pd(pDu + 4, _du1);
+			_mm256_storeu_pd(pDu + 8, _du2);
+			_mm256_storeu_pd(pDu + 12, _du3);
+			_mm256_storeu_pd(pDu + 16, _du4);
+			_mm256_storeu_pd(pDu + 20, _du5);
+#endif
+			pKer1 += nsPadded;
+		}
+		break;
+	case 16:
+		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			BIGINT si = sort_indices[i];
+			__m256d _dd0 = _mm256_permute4x64_pd(
+				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
+				0x44);
+
+			// offset rel to subgrid, starts the output indices
+			double* pDu = du + 2 * (i1[i] - off1);
+
+			__m256d _k0 = _mm256_load_pd(pKer1 + 0);
+			__m256d _k2 = _mm256_load_pd(pKer1 + 4);
+
+			__m256d _kk0 = _mm256_permute4x64_pd(_k0, 0x50);
+			__m256d _kk1 = _mm256_permute4x64_pd(_k0, 0xfa);
+			__m256d _kk2 = _mm256_permute4x64_pd(_k2, 0x50);
+			__m256d _kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
+
+			__m256d _du0 = _mm256_load_pd(pDu + 0);
+			__m256d _du1 = _mm256_load_pd(pDu + 4);
+			__m256d _du2 = _mm256_load_pd(pDu + 8);
+			__m256d _du3 = _mm256_load_pd(pDu + 12);
+
+			_du0 = _mm256_fmadd_pd(_dd0, _kk0, _du0);
+			_du1 = _mm256_fmadd_pd(_dd0, _kk1, _du1);
+			_du2 = _mm256_fmadd_pd(_dd0, _kk2, _du2);
+			_du3 = _mm256_fmadd_pd(_dd0, _kk3, _du3);
+
+#ifdef _MSC_VER
+			_mm256_store_pd(pDu + 0, _du0);
+			_mm256_store_pd(pDu + 4, _du1);
+			_mm256_store_pd(pDu + 8, _du2);
+			_mm256_store_pd(pDu + 12, _du3);
+#else
+			_mm256_storeu_pd(pDu + 0, _du0);
+			_mm256_storeu_pd(pDu + 4, _du1);
+			_mm256_storeu_pd(pDu + 8, _du2);
+			_mm256_storeu_pd(pDu + 12, _du3);
+#endif
+
+			_k0 = _mm256_load_pd(pKer1 + 8);
+			_k2 = _mm256_load_pd(pKer1 + 12);
+
+			_kk0 = _mm256_permute4x64_pd(_k0, 0x50);
+			_kk1 = _mm256_permute4x64_pd(_k0, 0xfa);
+			_kk2 = _mm256_permute4x64_pd(_k2, 0x50);
+			_kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
+
+			_du0 = _mm256_load_pd(pDu + 16);
+			_du1 = _mm256_load_pd(pDu + 20);
+			_du2 = _mm256_load_pd(pDu + 24);
+			_du3 = _mm256_load_pd(pDu + 28);
+
+			_du0 = _mm256_fmadd_pd(_dd0, _kk0, _du0);
+			_du1 = _mm256_fmadd_pd(_dd0, _kk1, _du1);
+			_du2 = _mm256_fmadd_pd(_dd0, _kk2, _du2);
+			_du3 = _mm256_fmadd_pd(_dd0, _kk3, _du3);
+
+#ifdef _MSC_VER
+			_mm256_store_pd(pDu + 16, _du0);
+			_mm256_store_pd(pDu + 20, _du1);
+			_mm256_store_pd(pDu + 24, _du2);
+			_mm256_store_pd(pDu + 28, _du3);
+#else
+			_mm256_storeu_pd(pDu + 16, _du0);
+			_mm256_storeu_pd(pDu + 20, _du1);
+			_mm256_storeu_pd(pDu + 24, _du2);
+			_mm256_storeu_pd(pDu + 28, _du3);
+#endif
+			pKer1 += nsPadded;
+		}
+		break;
 	default:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];

@@ -55,14 +55,17 @@ void onedim_fseries_kernel(BIGINT nf, T* fwkerhalf, spread_opts opts)
     for (int n = 0; n < q; ++n)
         aj[n] = std::complex<T>(1, 0);
 
-    for (BIGINT j = 0; j < nout; ++j) {          // loop along output array
-        T x = 0.0;                      // accumulator for answer at this j
-        for (int n = 0; n < q; ++n) {
-            x += f[n] * 2 * real(aj[n]);      // include the negative freq
-            aj[n] *= a[n];                  // wind the phases
-        }
-        fwkerhalf[j] = x;
-    }
+    tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nout, 10000), // loop along output array
+        [&](const tbb::blocked_range<BIGINT>& r) {
+            for (BIGINT j = r.begin(); j < r.end(); ++j) {
+                T x = 0.0;                      // accumulator for answer at this j
+                for (int n = 0; n < q; ++n) {
+                    x += f[n] * 2 * real(aj[n]);      // include the negative freq
+                    aj[n] *= a[n];                  // wind the phases
+                }
+                fwkerhalf[j] = x;
+            }
+        });
 }
 
 #endif
