@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <tbb/tbb.h>
+#include <mkl_vsl.h>
+
 void usage()
 {
   printf("usage: spreadtestnd dims [M N [tol [sort [flags [debug [kerpad [kerevalmeth [upsampfac]]]]]]]]\n\twhere dims=1,2 or 3\n\tM=# nonuniform pts\n\tN=# uniform pts\n\ttol=requested accuracy\n\tsort=0 (don't sort NU pts), 1 (do), or 2 (maybe sort; default)\n\tflags: expert timing flags, 0 is default (see spreadinterp.h)\n\tdebug=0 (less text out), 1 (more), 2 (lots)\n\tkerpad=0 (no pad to mult of 4), 1 (do, for kerevalmeth=0 only)\n\tkerevalmeth=0 (direct), 1 (Horner ppval)\n\tupsampfac>1; 2 or 1.25 for Horner\n\nexample: ./spreadtestnd 1 1e6 1e6 1e-6 2 0 1\n");
@@ -92,6 +95,8 @@ int main(int argc, char* argv[])
     }
   }
 
+  tbb::global_control thread_limit(tbb::global_control::max_allowed_parallelism, 1);
+
   int dodir1 = true;                        // control if dir=1 tested at all
   BIGINT N = (BIGINT)round(pow(roughNg,1.0/d));     // Fourier grid size per dim
   BIGINT Ng = (BIGINT)pow(N,d);                     // actual total grid points
@@ -123,36 +128,75 @@ int main(int argc, char* argv[])
   // spread a single source, only for reference accuracy check...
   opts.spread_direction=1;
   d_nonuniform[0] = 1.0; d_nonuniform[1] = 0.0;   // unit strength
-  kx[0] = ky[0] = kz[0] = N/2.0;                  // at center
+  kx[0] = ky[0] = kz[0] = N/FLT(2.0);                  // at center
   int ier = spreadinterp(N,N2,N3,d_uniform.data(),1,kx.data(),ky.data(),kz.data(),d_nonuniform.data(),opts);          // vector::data officially C++11 but works
   if (ier!=0) {
     printf("error when spreading M=1 pt for ref acc check (ier=%d)!\n",ier);
     return ier;
   }
-  FLT kersumre = 0.0, kersumim = 0.0;  // sum kernel on uniform grid
-  for (BIGINT i=0;i<Ng;++i) {
-    kersumre += d_uniform[2*i]; 
-    kersumim += d_uniform[2*i+1];    // in case the kernel isn't real!
-  }
+
+  CPX kersum = tbb::parallel_reduce(  // sum kernel on uniform grid
+      tbb::blocked_range<BIGINT>(0, Ng),
+      CPX(0.0, 0.0),
+      [&](tbb::blocked_range<BIGINT>& r, CPX init) -> CPX {
+          for (BIGINT j = r.begin(); j < r.end(); j++) {
+              init += CPX(d_uniform[2 * j], d_uniform[2 * j + 1]);
+          }
+
+          return init;
+      },
+      [](CPX a, CPX b) -> CPX {
+          return a + b;
+      });
 
   // now do the large-scale test w/ random sources..
+  // initialize RNG
+  VSLStreamStatePtr vslStream;
+  int errcode = vslNewStream(&vslStream, VSL_BRNG_SFMT19937, 111);
   printf("making random data...\n");
-  FLT strre = 0.0, strim = 0.0;          // also sum the strengths
-#pragma omp parallel
-  {
-    unsigned int se=MY_OMP_GET_THREAD_NUM();  // needed for parallel random #s
-#pragma omp for schedule(dynamic,1000000) reduction(+:strre,strim)
-    for (BIGINT i=0; i<M; ++i) {
-      kx[i]=rand01r(&se)*N;
-      //kx[i]=2.0*kx[i] - 50.0;      //// to test folding within +-1 period
-      if (d>1) ky[i]=rand01r(&se)*N;      // only fill needed coords
-      if (d>2) kz[i]=rand01r(&se)*N;
-      d_nonuniform[i*2]=randm11r(&se);
-      d_nonuniform[i*2+1]=randm11r(&se);
-      strre += d_nonuniform[2*i]; 
-      strim += d_nonuniform[2*i+1];
-    }
+
+#ifdef SINGLE
+  switch (d) {
+  case 3:
+      errcode = vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kz.data(), 0.0f, 1.0f);
+      // fall through
+  case 2:
+      errcode = vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, ky.data(), 0.0f, 1.0f);
+      // fall through
+  case 1:
+      errcode = vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kx.data(), 0.0f, 1.0f);
+      errcode = vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, 2 * M, d_nonuniform.data(), -1.0f, 1.0f);
+      break;
   }
+#else
+  switch (d) {
+  case 3:
+      errcode = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kz.data(), 0.0, 1.0);
+      // fall through
+  case 2:
+      errcode = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, ky.data(), 0.0, 1.0);
+      // fall through
+  case 1:
+      errcode = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kx.data(), 0.0, 1.0);
+      errcode = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, 2 * M, d_nonuniform.data(), -1.0, 1.0);
+      break;
+  }
+#endif
+
+  CPX str = tbb::parallel_reduce(
+      tbb::blocked_range<BIGINT>(0, M),
+      CPX(0.0, 0.0),
+      [&](tbb::blocked_range<BIGINT>& r, CPX init) -> CPX {
+          for (BIGINT j = r.begin(); j < r.end(); j++) {
+              init += CPX(d_nonuniform[2 * j], d_nonuniform[2 * j + 1]);
+          }
+
+          return init;
+      },
+      [](CPX a, CPX b) -> CPX {
+          return a + b;
+      });
+
   CNTime timer;
   double t;
   if (dodir1) {   // test direction 1 (NU -> U spreading) ......................
@@ -166,16 +210,23 @@ int main(int argc, char* argv[])
     } else
       printf("    %.3g NU pts in %.3g s \t%.3g pts/s \t%.3g spread pts/s\n",(double)M,t,M/t,pow(opts.nspread,d)*M/t);
   
-    FLT sumre = 0.0, sumim = 0.0;   // check spreading accuracy, wrapping
-#pragma omp parallel for reduction(+:sumre,sumim)
-    for (BIGINT i=0;i<Ng;++i) {
-      sumre += d_uniform[2*i]; 
-      sumim += d_uniform[2*i+1];
-    }
-    FLT pre = kersumre*strre - kersumim*strim;   // pred ans, complex mult
-    FLT pim = kersumim*strre + kersumre*strim;
-    FLT maxerr = std::max(fabs(sumre-pre), fabs(sumim-pim));
-    FLT ansmod = sqrt(sumre*sumre+sumim*sumim);
+    CPX sum = tbb::parallel_reduce(  // check spreading accuracy, wrapping
+        tbb::blocked_range<BIGINT>(0, Ng),
+        CPX(0.0, 0.0),
+        [&](tbb::blocked_range<BIGINT>& r, CPX init) -> CPX {
+            for (BIGINT j = r.begin(); j < r.end(); j++) {
+                init += CPX(d_uniform[2 * j], d_uniform[2 * j + 1]);
+            }
+
+            return init;
+        },
+        [](CPX a, CPX b) -> CPX {
+            return a + b;
+        });
+
+    CPX p = kersum*str;   // pred ans, complex mult
+    FLT maxerr = max(abs(sum.real()-p.real()), abs(sum.imag()-p.imag()));
+    FLT ansmod = abs(sum);
     printf("    rel err in total over grid:      %.3g\n",maxerr/ansmod);
     // note this is weaker than below dir=2 test, but is good indicator that
     // periodic wrapping is correct
@@ -187,17 +238,32 @@ int main(int argc, char* argv[])
     d_uniform[2*i] = 1.0;
     d_uniform[2*i+1] = 0.0;
   }
-#pragma omp parallel
-  {
-    unsigned int s=MY_OMP_GET_THREAD_NUM();  // needed for parallel random #s
-#pragma omp for schedule(dynamic,1000000)
-      for (BIGINT i=0; i<M; ++i) {       // random target pts
-        //kx[i]=10+.9*rand01r(&s)*N;   // or if want to keep ns away from edges
-	kx[i]=rand01r(&s)*N;
-	if (d>1) ky[i]=rand01r(&s)*N;
-	if (d>2) kz[i]=rand01r(&s)*N;
-      }
+
+#ifdef SINGLE
+  switch (d) {
+  case 3:
+      errcode = vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kz.data(), 0.0f, 1.0f);
+      // fall through
+  case 2:
+      errcode = vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, ky.data(), 0.0f, 1.0f);
+      // fall through
+  case 1:
+      errcode = vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kx.data(), 0.0f, 1.0f);
+      break;
   }
+#else
+  switch (d) {
+  case 3:
+      errcode = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kz.data(), 0.0, 1.0);
+      // fall through
+  case 2:
+      errcode = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, ky.data(), 0.0, 1.0);
+      // fall through
+  case 1:
+      errcode = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, vslStream, M, kx.data(), 0.0, 1.0);
+      break;
+  }
+#endif
 
   opts.spread_direction=2;
   printf("spreadinterp %dD, %.3g U pts, dir=%d, tol=%.3g: nspread=%d\n",d,(double)Ng,opts.spread_direction,tol,opts.nspread);
@@ -213,15 +279,17 @@ int main(int argc, char* argv[])
   // math test is worst-case error from pred value (kersum) on interp pts:
   maxerr = 0.0;
   for (BIGINT i=0;i<M;++i) {
-    FLT err = std::max(fabs(d_nonuniform[2*i]-kersumre),
-		       fabs(d_nonuniform[2*i+1]-kersumim));
+    FLT err = max(abs(d_nonuniform[2*i]-kersum.real()),
+		       abs(d_nonuniform[2*i+1]-kersum.imag()));
     if (err>maxerr) maxerr=err;
   }
-  ansmod = sqrt(kersumre*kersumre+kersumim*kersumim);
+  ansmod = abs(kersum);
   printf("    max rel err in values at NU pts: %.3g\n",maxerr/ansmod);
   // this is stronger test than for dir=1, since it tests sum of kernel for
   // each NU pt. However, it cannot detect reading
   // from wrong grid pts (they are all unity)
+
+  errcode = vslDeleteStream(&vslStream);
 
   return 0;
 }

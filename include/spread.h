@@ -409,6 +409,56 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 	double* pKer2 = kernel_vals2 + begin * nsPadded;
 
 	switch (nsPadded) {
+	case 8:
+		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			BIGINT si = sort_indices[i];
+			__m256d _dd0 = _mm256_permute4x64_pd(
+				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
+				0x44);
+
+			// Combine kernel with complex source value to simplify inner loop
+			__m256d _k0 = _mm256_load_pd(pKer1 + 0);
+			__m256d _k2 = _mm256_load_pd(pKer1 + 4);
+
+			__m256d _kk0 = _mm256_mul_pd(_dd0, _mm256_permute4x64_pd(_k0, 0x50));
+			__m256d _kk1 = _mm256_mul_pd(_dd0, _mm256_permute4x64_pd(_k0, 0xfa));
+			__m256d _kk2 = _mm256_mul_pd(_dd0, _mm256_permute4x64_pd(_k2, 0x50));
+			__m256d _kk3 = _mm256_mul_pd(_dd0, _mm256_permute4x64_pd(_k2, 0xfa));
+
+			// critical inner loop:
+			for (int dy = 0; dy < ns; ++dy) {
+				BIGINT j = size1 * (i2[i] - off2 + dy) + i1[i] - off1;   // should be in subgrid
+				double* pDu = du + 2 * j;
+
+				__m256d _kerval = _mm256_set1_pd(pKer2[dy]);
+
+				__m256d _du0 = _mm256_load_pd(pDu + 0);
+				__m256d _du1 = _mm256_load_pd(pDu + 4);
+				__m256d _du2 = _mm256_load_pd(pDu + 8);
+				__m256d _du3 = _mm256_load_pd(pDu + 12);
+
+				_du0 = _mm256_fmadd_pd(_kerval, _kk0, _du0);
+				_du1 = _mm256_fmadd_pd(_kerval, _kk1, _du1);
+				_du2 = _mm256_fmadd_pd(_kerval, _kk2, _du2);
+				_du3 = _mm256_fmadd_pd(_kerval, _kk3, _du3);
+
+#ifdef _MSC_VER
+				_mm256_store_pd(pDu + 0, _du0);
+				_mm256_store_pd(pDu + 4, _du1);
+				_mm256_store_pd(pDu + 8, _du2);
+				_mm256_store_pd(pDu + 12, _du3);
+#else
+				_mm256_storeu_pd(pDu + 0, _du0);
+				_mm256_storeu_pd(pDu + 4, _du1);
+				_mm256_storeu_pd(pDu + 8, _du2);
+				_mm256_storeu_pd(pDu + 12, _du3);
+#endif
+			}
+
+			pKer1 += nsPadded;
+			pKer2 += nsPadded;
+		}
+		break;
 	case 12:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];

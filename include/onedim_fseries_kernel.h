@@ -36,7 +36,7 @@ void onedim_fseries_kernel(BIGINT nf, T* fwkerhalf, spread_opts opts)
   Fixed num_threads 7/20/20
  */
 {
-    T J2 = opts.nspread / 2.0;            // J/2, half-width of ker z-support
+    T J2 = opts.nspread / T(2.0);            // J/2, half-width of ker z-support
     // # quadr nodes in z (from 0 to J/2; reflections will be added)...
     int q = (int)(2 + 3.0 * J2);  // not sure why so large? cannot exceed MAX_NQUAD
     int qPadded = 4 * (1 + (q - 1) / 4); // pad q to mult of 4

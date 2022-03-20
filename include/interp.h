@@ -408,32 +408,145 @@ inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform,
 	double* pKer1 = kernel_vals1 + begin * nsPadded;
 	double* pKer2 = kernel_vals2 + begin * nsPadded;
 
-	for (BIGINT i = begin; i < end; i++)
-	{
-		__m128d _out = _mm_setzero_pd();
+	switch (nsPadded) {
+	case 8:
+		for (BIGINT i = begin; i < end; i++)
+		{
+			__m256d _out0 = _mm256_setzero_pd();
+			__m256d _out1 = _mm256_setzero_pd();
+			__m256d _out2 = _mm256_setzero_pd();
+			__m256d _out3 = _mm256_setzero_pd();
 
-		// no wrapping: avoid ptrs
-		for (int dy = 0; dy < ns; dy++) {
-			double* pDu = du_padded + 2 * (paddedN1 * (i2[i] + dy) + i1[i]);
+			for (int dy = 0; dy < ns; dy++) {
+				double* pDu = du_padded + 2 * (paddedN1 * (i2[i] + dy) + i1[i]);
 
-			for (int dx = 0; dx < ns; dx++) {
-				__m128d _kk = _mm_set1_pd(pKer1[dx] * pKer2[dy]);
+				__m256d _ker2 = _mm256_set1_pd(pKer2[dy]);
 
-				__m128d _du = _mm_load_pd(pDu);
+				__m256d _k0 = _mm256_mul_pd(_ker2, _mm256_load_pd(pKer1 + 0));
+				__m256d _k2 = _mm256_mul_pd(_ker2, _mm256_load_pd(pKer1 + 4));
 
-				_out = _mm_fmadd_pd(_kk, _du, _out);
+				__m256d _kk0 = _mm256_permute4x64_pd(_k0, 0x50);
+				__m256d _kk1 = _mm256_permute4x64_pd(_k0, 0xfa);
+				__m256d _kk2 = _mm256_permute4x64_pd(_k2, 0x50);
+				__m256d _kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
 
-				pDu += 2;
+				__m256d _du0 = _mm256_load_pd(pDu + 0);
+				__m256d _du1 = _mm256_load_pd(pDu + 4);
+				__m256d _du2 = _mm256_load_pd(pDu + 8);
+				__m256d _du3 = _mm256_load_pd(pDu + 12);
+
+				_out0 = _mm256_fmadd_pd(_kk0, _du0, _out0);
+				_out1 = _mm256_fmadd_pd(_kk1, _du1, _out1);
+				_out2 = _mm256_fmadd_pd(_kk2, _du2, _out2);
+				_out3 = _mm256_fmadd_pd(_kk3, _du3, _out3);
 			}
+
+			_out0 = _mm256_add_pd(_out0, _out1);
+			_out2 = _mm256_add_pd(_out2, _out3);
+			_out0 = _mm256_add_pd(_out0, _out2);
+
+			__m128d _out = _mm_add_pd(
+				_mm256_castpd256_pd128(_out0),
+				_mm256_extractf128_pd(_out0, 1));
+
+			// Copy result buffer to output array
+			BIGINT si0 = sort_indices[i];
+
+			_mm_store_pd(data_nonuniform + 2 * si0, _out);
+
+			pKer1 += nsPadded;
+			pKer2 += nsPadded;
 		}
+		break;
+	case 12:
+		for (BIGINT i = begin; i < end; i++)
+		{
+			__m256d _out0 = _mm256_setzero_pd();
+			__m256d _out1 = _mm256_setzero_pd();
+			__m256d _out2 = _mm256_setzero_pd();
+			__m256d _out3 = _mm256_setzero_pd();
+			__m256d _out4 = _mm256_setzero_pd();
+			__m256d _out5 = _mm256_setzero_pd();
 
-		// Copy result buffer to output array
-		BIGINT si0 = sort_indices[i];
+			for (int dy = 0; dy < ns; dy++) {
+				double* pDu = du_padded + 2 * (paddedN1 * (i2[i] + dy) + i1[i]);
 
-		_mm_store_pd(data_nonuniform + 2 * si0, _out);
+				__m256d _ker2 = _mm256_set1_pd(pKer2[dy]);
 
-		pKer1 += nsPadded;
-		pKer2 += nsPadded;
+				__m256d _k0 = _mm256_mul_pd(_ker2, _mm256_load_pd(pKer1 + 0));
+				__m256d _k2 = _mm256_mul_pd(_ker2, _mm256_load_pd(pKer1 + 4));
+				__m256d _k4 = _mm256_mul_pd(_ker2, _mm256_load_pd(pKer1 + 8));
+
+				__m256d _kk0 = _mm256_permute4x64_pd(_k0, 0x50);
+				__m256d _kk1 = _mm256_permute4x64_pd(_k0, 0xfa);
+				__m256d _kk2 = _mm256_permute4x64_pd(_k2, 0x50);
+				__m256d _kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
+				__m256d _kk4 = _mm256_permute4x64_pd(_k4, 0x50);
+				__m256d _kk5 = _mm256_permute4x64_pd(_k4, 0xfa);
+
+				__m256d _du0 = _mm256_load_pd(pDu + 0);
+				__m256d _du1 = _mm256_load_pd(pDu + 4);
+				__m256d _du2 = _mm256_load_pd(pDu + 8);
+				__m256d _du3 = _mm256_load_pd(pDu + 12);
+				__m256d _du4 = _mm256_load_pd(pDu + 16);
+				__m256d _du5 = _mm256_load_pd(pDu + 20);
+
+				_out0 = _mm256_fmadd_pd(_kk0, _du0, _out0);
+				_out1 = _mm256_fmadd_pd(_kk1, _du1, _out1);
+				_out2 = _mm256_fmadd_pd(_kk2, _du2, _out2);
+				_out3 = _mm256_fmadd_pd(_kk3, _du3, _out3);
+				_out4 = _mm256_fmadd_pd(_kk4, _du4, _out4);
+				_out5 = _mm256_fmadd_pd(_kk5, _du5, _out5);
+			}
+
+			_out0 = _mm256_add_pd(_out0, _out1);
+			_out2 = _mm256_add_pd(_out2, _out3);
+			_out4 = _mm256_add_pd(_out4, _out5);
+			_out0 = _mm256_add_pd(_out0, _out2);
+			_out0 = _mm256_add_pd(_out0, _out4);
+
+			__m128d _out = _mm_add_pd(
+				_mm256_castpd256_pd128(_out0),
+				_mm256_extractf128_pd(_out0, 1));
+
+			// Copy result buffer to output array
+			BIGINT si0 = sort_indices[i];
+
+			_mm_store_pd(data_nonuniform + 2 * si0, _out);
+
+			pKer1 += nsPadded;
+			pKer2 += nsPadded;
+		}
+		break;
+	default:
+		for (BIGINT i = begin; i < end; i++)
+		{
+			__m128d _out = _mm_setzero_pd();
+
+			// no wrapping: avoid ptrs
+			for (int dy = 0; dy < ns; dy++) {
+				double* pDu = du_padded + 2 * (paddedN1 * (i2[i] + dy) + i1[i]);
+
+				for (int dx = 0; dx < ns; dx++) {
+					__m128d _kk = _mm_set1_pd(pKer1[dx] * pKer2[dy]);
+
+					__m128d _du = _mm_load_pd(pDu);
+
+					_out = _mm_fmadd_pd(_kk, _du, _out);
+
+					pDu += 2;
+				}
+			}
+
+			// Copy result buffer to output array
+			BIGINT si0 = sort_indices[i];
+
+			_mm_store_pd(data_nonuniform + 2 * si0, _out);
+
+			pKer1 += nsPadded;
+			pKer2 += nsPadded;
+		}
+		break;
 	}
 }
 template<>

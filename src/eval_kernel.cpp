@@ -339,7 +339,7 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 			// scale so local grid offset z in [-1,1]
 			__m256d _z_a = _mm256_fmadd_pd(_x_a, _two, _ns_m_1);
 
-			int j = np;
+			int j = np - 1;
 
 			__m256d _k_a0 = _mm256_load_pd(c + 0 + nsPadded * j);
 			__m256d _k_a1 = _mm256_load_pd(c + 4 + nsPadded * j);
@@ -416,7 +416,7 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 			// scale so local grid offset z in [-1,1]
 			__m256d _z_a = _mm256_fmadd_pd(_x_a, _two, _ns_m_1);
 
-			int j = np;
+			int j = np - 1;
 
 			__m256d _k_a0 = _mm256_load_pd(c + 0 + nsPadded * j);
 			__m256d _k_a1 = _mm256_load_pd(c + 4 + nsPadded * j);
