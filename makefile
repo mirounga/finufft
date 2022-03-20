@@ -35,7 +35,7 @@ CXXFLAGS := $(CFLAGS)
 FFTWNAME = fftw3
 # linux default is fftw3_omp, since 10% faster than fftw3_threads...
 FFTWOMPSUFFIX = omp
-LIBS :=  -L${MKLROOT}/lib/intel64 -ltbb -ltbbmalloc -lmkl_core -lmkl_intel_lp64 -lm
+LIBS :=  -L${MKLROOT}/lib/intel64 -ltbb -ltbbmalloc -lmkl_core -lmkl_intel_ilp64 -lm
 # multithreading for GCC: C++/C/Fortran, MATLAB, and octave (ICC differs)...
 OMPFLAGS = -fopenmp
 OMPLIBS = -lgomp

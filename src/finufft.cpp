@@ -211,7 +211,7 @@ void onedim_nuft_kernel(BIGINT nk, FLT *k, FLT *phihat, spread_opts opts)
               phihat[j] = x;
           }
       });
-}  
+}
 
 void deconvolveshuffle1d(int dir,FLT prefac,FLT* ker, BIGINT ms,
 			 FLT *fk, BIGINT nf1, FFTW_CPX* fw, int modeord)
@@ -368,19 +368,13 @@ int spreadinterpSortedBatch(int batchSize, FINUFFT_PLAN p, CPX* cBatch)
   // But when nthr_outer=1 here, omp par inside the loop sees all threads...
   int nthr_outer = p->opts.spread_thread==1 ? 1 : batchSize;
   
-  tbb::task_group batchTasks;
-
+#pragma omp parallel for num_threads(nthr_outer)
   for (int i=0; i<batchSize; i++) {
-      batchTasks.run([&] {
-          FFTW_CPX* fwi = p->fwBatch + i * p->nf;  // start of i'th fw array in wkspace
-          CPX* ci = cBatch + i * p->nj;            // start of i'th c array in cBatch
-          spreadinterpSorted(p->sortIndices, p->nf1, p->nf2, p->nf3, (FLT*)fwi, p->nj,
-              p->X, p->Y, p->Z, (FLT*)ci, p->spopts, p->didSort);
-          });
+    FFTW_CPX *fwi = p->fwBatch + i*p->nf;  // start of i'th fw array in wkspace
+    CPX *ci = cBatch + i*p->nj;            // start of i'th c array in cBatch
+    spreadinterpSorted(p->sortIndices, p->nf1, p->nf2, p->nf3, (FLT*)fwi, p->nj,
+                       p->X, p->Y, p->Z, (FLT*)ci, p->spopts, p->didSort);
   }
-
-  batchTasks.wait();
-
   return 0;
 }
 
@@ -396,37 +390,32 @@ int deconvolveBatch(int batchSize, FINUFFT_PLAN p, CPX* fkBatch)
   Barnett 5/21/20, simplified from Malleo 2019 (eg t3 logic won't be in here)
 */
 {
-  // since deconvolveshuffle?d are single-thread, parallel seems to help here...
-    tbb::task_group batchTasks;
-
-    for (int i = 0; i < batchSize; i++) {
-        batchTasks.run([&] {
-            FFTW_CPX* fwi = p->fwBatch + i * p->nf;  // start of i'th fw array in wkspace
-            CPX* fki = fkBatch + i * p->N;           // start of i'th fk array in fkBatch
-
-            // Call routine from common.cpp for the dim; prefactors hardcoded to 1.0...
-            switch (p->dim) {
-            case 1:
-                deconvolveshuffle1d(p->spopts.spread_direction, 1.0, p->phiHat1,
-                    p->ms, (FLT*)fki,
-                    p->nf1, fwi, p->opts.modeord);
-                break;
-            case 2:
-                deconvolveshuffle2d(p->spopts.spread_direction, 1.0, p->phiHat1,
-                    p->phiHat2, p->ms, p->mt, (FLT*)fki,
-                    p->nf1, p->nf2, fwi, p->opts.modeord);
-                break;
-            case 3:
-                deconvolveshuffle3d(p->spopts.spread_direction, 1.0, p->phiHat1,
-                    p->phiHat2, p->phiHat3, p->ms, p->mt, p->mu,
-                    (FLT*)fki, p->nf1, p->nf2, p->nf3,
-                    fwi, p->opts.modeord);
-                break;
-            }
-            });
+  // since deconvolveshuffle?d are single-thread, omp par seems to help here...
+#pragma omp parallel for num_threads(batchSize)
+  for (int i=0; i<batchSize; i++) {
+    FFTW_CPX *fwi = p->fwBatch + i*p->nf;  // start of i'th fw array in wkspace
+    CPX *fki = fkBatch + i*p->N;           // start of i'th fk array in fkBatch
+    
+    // Call routine from common.cpp for the dim; prefactors hardcoded to 1.0...
+    switch (p->dim) {
+    case 1:
+        deconvolveshuffle1d(p->spopts.spread_direction, 1.0, p->phiHat1,
+            p->ms, (FLT*)fki,
+            p->nf1, fwi, p->opts.modeord);
+        break;
+    case 2:
+        deconvolveshuffle2d(p->spopts.spread_direction, 1.0, p->phiHat1,
+            p->phiHat2, p->ms, p->mt, (FLT*)fki,
+            p->nf1, p->nf2, fwi, p->opts.modeord);
+        break;
+    case 3:
+        deconvolveshuffle3d(p->spopts.spread_direction, 1.0, p->phiHat1,
+            p->phiHat2, p->phiHat3, p->ms, p->mt, p->mu,
+            (FLT*)fki, p->nf1, p->nf2, p->nf3,
+            fwi, p->opts.modeord);
+        break;
     }
-
-    batchTasks.wait();
+  }
   return 0;
 }
 
@@ -603,8 +592,7 @@ int FINUFFT_MAKEPLAN(int type, int dim, BIGINT* n_modes, int iflag,
       static bool did_fftw_init = 0;    // the only global state of FINUFFT
       if (!did_fftw_init) {
 	FFTW_INIT();            // setup FFTW global state; should only do once
-	//FFTW_PLAN_TH(nthr_fft); // ditto
-	FFTW_PLAN_TH(8); // ditto
+	FFTW_PLAN_TH(nthr_fft); // ditto
 	FFTW_PLAN_SF();         // if -DFFTW_PLAN_SAFE, make FFTW thread-safe
 	did_fftw_init = 1;      // insure other FINUFFT threads don't clash
       }
@@ -801,7 +789,6 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
       ig2 = 1.0/p->t3P.gam2;
     if (d>2)
       ig3 = 1.0/p->t3P.gam3;
-
     tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nj, 10000), // ... loop over src NU locs
         [&](const tbb::blocked_range<BIGINT>& r) {
             for (BIGINT j = r.begin(); j < r.end(); ++j) {
@@ -817,17 +804,17 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
     CPX imasign = (p->fftSign>=0) ? IMA : -IMA;             // +-i
     p->prephase = (CPX*)scalable_aligned_malloc(sizeof(CPX)*nj, 64);
     if (p->t3P.D1!=0.0 || p->t3P.D2!=0.0 || p->t3P.D3!=0.0) {
-    tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nj, 10000), // ... loop over src NU locs
-        [&](const tbb::blocked_range<BIGINT>& r) {
-            for (BIGINT j = r.begin(); j < r.end(); ++j) {
-                FLT phase = p->t3P.D1 * xj[j];
-                if (d > 1)
-                    phase += p->t3P.D2 * yj[j];
-                if (d > 2)
-                    phase += p->t3P.D3 * zj[j];
-                p->prephase[j] = cos(phase) + imasign * sin(phase);   // Euler e^{+-i.phase}
-            }
-        });
+        tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nj, 10000), // ... loop over src NU locs
+            [&](const tbb::blocked_range<BIGINT>& r) {
+                for (BIGINT j = r.begin(); j < r.end(); ++j) {
+                    FLT phase = p->t3P.D1 * xj[j];
+                    if (d > 1)
+                        phase += p->t3P.D2 * yj[j];
+                    if (d > 2)
+                        phase += p->t3P.D3 * zj[j];
+                    p->prephase[j] = cos(phase) + imasign * sin(phase);   // Euler e^{+-i.phase}
+                }
+            });
     } else
       for (BIGINT j=0;j<nj;++j)
         p->prephase[j] = (CPX)1.0;     // *** or keep flag so no mult in exec??
@@ -843,7 +830,7 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
                     p->Up[k] = p->t3P.h3 * p->t3P.gam3 * (u[k] - p->t3P.D3);  // so |u'_k| < pi/R
             }
         });
-    
+
     // (old STEP 3a) Compute deconvolution post-factors array (per targ pt)...
     // (exploits that FT separates because kernel is prod of 1D funcs)
     p->deconv = (CPX*)scalable_aligned_malloc(sizeof(CPX)*nk, 64);
@@ -1011,17 +998,15 @@ int FINUFFT_EXECUTE(FINUFFT_PLAN p, CPX* cj, CPX* fk){
       
       // STEP 0: pre-phase (possibly) the c_j input strengths into c'_j batch...
       timer.restart();
-      tbb::task_group batchTasks;
-
       for (int i=0; i<thisBatchSize; i++) {
-          batchTasks.run([&] {
-              BIGINT ioff = i * p->nj;
-              for (BIGINT j = 0; j < p->nj; ++j)
-                  p->CpBatch[ioff + j] = p->prephase[j] * cjb[ioff + j];
-              });
+        BIGINT ioff = i*p->nj;
+        tbb::parallel_for(tbb::blocked_range<BIGINT>(0, p->nj, 10000), // .... loop over NU targ freqs
+            [&](const tbb::blocked_range<BIGINT>& r) {
+                for (BIGINT j = r.begin(); j < r.end(); ++j) {
+                    p->CpBatch[ioff + j] = p->prephase[j] * cjb[ioff + j];
+                }
+            });
       }
-
-      batchTasks.wait();
       t_pre += timer.elapsedsec(); 
       
       // STEP 1: spread c'_j batch (x'_j NU pts) into fw batch grid...
