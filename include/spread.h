@@ -89,27 +89,21 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 			__m256d _kk2 = _mm256_permute4x64_pd(_k2, 0x50);
 			__m256d _kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
 
-			__m256d _du0 = _mm256_load_pd(pDu + 0);
-			__m256d _du1 = _mm256_load_pd(pDu + 4);
-			__m256d _du2 = _mm256_load_pd(pDu + 8);
-			__m256d _du3 = _mm256_load_pd(pDu + 12);
+			__m256d _du0 = _mm256_loadu_pd(pDu + 0);
+			__m256d _du1 = _mm256_loadu_pd(pDu + 4);
+			__m256d _du2 = _mm256_loadu_pd(pDu + 8);
+			__m256d _du3 = _mm256_loadu_pd(pDu + 12);
 
 			_du0 = _mm256_fmadd_pd(_dd0, _kk0, _du0);
 			_du1 = _mm256_fmadd_pd(_dd0, _kk1, _du1);
 			_du2 = _mm256_fmadd_pd(_dd0, _kk2, _du2);
 			_du3 = _mm256_fmadd_pd(_dd0, _kk3, _du3);
 
-#ifdef _MSC_VER
-			_mm256_store_pd(pDu + 0, _du0);
-			_mm256_store_pd(pDu + 4, _du1);
-			_mm256_store_pd(pDu + 8, _du2);
-			_mm256_store_pd(pDu + 12, _du3);
-#else
 			_mm256_storeu_pd(pDu + 0, _du0);
 			_mm256_storeu_pd(pDu + 4, _du1);
 			_mm256_storeu_pd(pDu + 8, _du2);
 			_mm256_storeu_pd(pDu + 12, _du3);
-#endif
+
 			pKer1 += nsPadded;
 		}
 		break;
@@ -134,12 +128,12 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 			__m256d _kk4 = _mm256_permute4x64_pd(_k4, 0x50);
 			__m256d _kk5 = _mm256_permute4x64_pd(_k4, 0xfa);
 
-			__m256d _du0 = _mm256_load_pd(pDu + 0);
-			__m256d _du1 = _mm256_load_pd(pDu + 4);
-			__m256d _du2 = _mm256_load_pd(pDu + 8);
-			__m256d _du3 = _mm256_load_pd(pDu + 12);
-			__m256d _du4 = _mm256_load_pd(pDu + 16);
-			__m256d _du5 = _mm256_load_pd(pDu + 20);
+			__m256d _du0 = _mm256_loadu_pd(pDu + 0);
+			__m256d _du1 = _mm256_loadu_pd(pDu + 4);
+			__m256d _du2 = _mm256_loadu_pd(pDu + 8);
+			__m256d _du3 = _mm256_loadu_pd(pDu + 12);
+			__m256d _du4 = _mm256_loadu_pd(pDu + 16);
+			__m256d _du5 = _mm256_loadu_pd(pDu + 20);
 
 			_du0 = _mm256_fmadd_pd(_dd0, _kk0, _du0);
 			_du1 = _mm256_fmadd_pd(_dd0, _kk1, _du1);
@@ -148,21 +142,13 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 			_du4 = _mm256_fmadd_pd(_dd0, _kk4, _du4);
 			_du5 = _mm256_fmadd_pd(_dd0, _kk5, _du5);
 
-#ifdef _MSC_VER
-			_mm256_store_pd(pDu + 0, _du0);
-			_mm256_store_pd(pDu + 4, _du1);
-			_mm256_store_pd(pDu + 8, _du2);
-			_mm256_store_pd(pDu + 12, _du3);
-			_mm256_store_pd(pDu + 16, _du4);
-			_mm256_store_pd(pDu + 20, _du5);
-#else
 			_mm256_storeu_pd(pDu + 0, _du0);
 			_mm256_storeu_pd(pDu + 4, _du1);
 			_mm256_storeu_pd(pDu + 8, _du2);
 			_mm256_storeu_pd(pDu + 12, _du3);
 			_mm256_storeu_pd(pDu + 16, _du4);
 			_mm256_storeu_pd(pDu + 20, _du5);
-#endif
+
 			pKer1 += nsPadded;
 		}
 		break;
@@ -184,27 +170,20 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 			__m256d _kk2 = _mm256_permute4x64_pd(_k2, 0x50);
 			__m256d _kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
 
-			__m256d _du0 = _mm256_load_pd(pDu + 0);
-			__m256d _du1 = _mm256_load_pd(pDu + 4);
-			__m256d _du2 = _mm256_load_pd(pDu + 8);
-			__m256d _du3 = _mm256_load_pd(pDu + 12);
+			__m256d _du0 = _mm256_loadu_pd(pDu + 0);
+			__m256d _du1 = _mm256_loadu_pd(pDu + 4);
+			__m256d _du2 = _mm256_loadu_pd(pDu + 8);
+			__m256d _du3 = _mm256_loadu_pd(pDu + 12);
 
 			_du0 = _mm256_fmadd_pd(_dd0, _kk0, _du0);
 			_du1 = _mm256_fmadd_pd(_dd0, _kk1, _du1);
 			_du2 = _mm256_fmadd_pd(_dd0, _kk2, _du2);
 			_du3 = _mm256_fmadd_pd(_dd0, _kk3, _du3);
 
-#ifdef _MSC_VER
-			_mm256_store_pd(pDu + 0, _du0);
-			_mm256_store_pd(pDu + 4, _du1);
-			_mm256_store_pd(pDu + 8, _du2);
-			_mm256_store_pd(pDu + 12, _du3);
-#else
 			_mm256_storeu_pd(pDu + 0, _du0);
 			_mm256_storeu_pd(pDu + 4, _du1);
 			_mm256_storeu_pd(pDu + 8, _du2);
 			_mm256_storeu_pd(pDu + 12, _du3);
-#endif
 
 			_k0 = _mm256_load_pd(pKer1 + 8);
 			_k2 = _mm256_load_pd(pKer1 + 12);
@@ -214,27 +193,21 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 			_kk2 = _mm256_permute4x64_pd(_k2, 0x50);
 			_kk3 = _mm256_permute4x64_pd(_k2, 0xfa);
 
-			_du0 = _mm256_load_pd(pDu + 16);
-			_du1 = _mm256_load_pd(pDu + 20);
-			_du2 = _mm256_load_pd(pDu + 24);
-			_du3 = _mm256_load_pd(pDu + 28);
+			_du0 = _mm256_loadu_pd(pDu + 16);
+			_du1 = _mm256_loadu_pd(pDu + 20);
+			_du2 = _mm256_loadu_pd(pDu + 24);
+			_du3 = _mm256_loadu_pd(pDu + 28);
 
 			_du0 = _mm256_fmadd_pd(_dd0, _kk0, _du0);
 			_du1 = _mm256_fmadd_pd(_dd0, _kk1, _du1);
 			_du2 = _mm256_fmadd_pd(_dd0, _kk2, _du2);
 			_du3 = _mm256_fmadd_pd(_dd0, _kk3, _du3);
 
-#ifdef _MSC_VER
-			_mm256_store_pd(pDu + 16, _du0);
-			_mm256_store_pd(pDu + 20, _du1);
-			_mm256_store_pd(pDu + 24, _du2);
-			_mm256_store_pd(pDu + 28, _du3);
-#else
 			_mm256_storeu_pd(pDu + 16, _du0);
 			_mm256_storeu_pd(pDu + 20, _du1);
 			_mm256_storeu_pd(pDu + 24, _du2);
 			_mm256_storeu_pd(pDu + 28, _du3);
-#endif
+
 			pKer1 += nsPadded;
 		}
 		break;
@@ -296,20 +269,14 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 			__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
 			__m256 _kk1 = _mm256_permutevar8x32_ps(_k0, _spreadhi);
 
-			__m256 _du0 = _mm256_load_ps(pDu + 0);
-			__m256 _du1 = _mm256_load_ps(pDu + 8);
+			__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+			__m256 _du1 = _mm256_loadu_ps(pDu + 8);
 
 			_du0 = _mm256_fmadd_ps(_dd0, _kk0, _du0);
 			_du1 = _mm256_fmadd_ps(_dd0, _kk1, _du1);
 
-#ifdef _MSC_VER
-			_mm256_store_ps(pDu + 0, _du0);
-			_mm256_store_ps(pDu + 8, _du1);
-#else
 			_mm256_storeu_ps(pDu + 0, _du0);
 			_mm256_storeu_ps(pDu + 8, _du1);
-#endif
-
 
 			pKer1 += nsPadded;
 		}
@@ -432,27 +399,20 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 
 				__m256d _kerval = _mm256_set1_pd(pKer2[dy]);
 
-				__m256d _du0 = _mm256_load_pd(pDu + 0);
-				__m256d _du1 = _mm256_load_pd(pDu + 4);
-				__m256d _du2 = _mm256_load_pd(pDu + 8);
-				__m256d _du3 = _mm256_load_pd(pDu + 12);
+				__m256d _du0 = _mm256_loadu_pd(pDu + 0);
+				__m256d _du1 = _mm256_loadu_pd(pDu + 4);
+				__m256d _du2 = _mm256_loadu_pd(pDu + 8);
+				__m256d _du3 = _mm256_loadu_pd(pDu + 12);
 
 				_du0 = _mm256_fmadd_pd(_kerval, _kk0, _du0);
 				_du1 = _mm256_fmadd_pd(_kerval, _kk1, _du1);
 				_du2 = _mm256_fmadd_pd(_kerval, _kk2, _du2);
 				_du3 = _mm256_fmadd_pd(_kerval, _kk3, _du3);
 
-#ifdef _MSC_VER
-				_mm256_store_pd(pDu + 0, _du0);
-				_mm256_store_pd(pDu + 4, _du1);
-				_mm256_store_pd(pDu + 8, _du2);
-				_mm256_store_pd(pDu + 12, _du3);
-#else
 				_mm256_storeu_pd(pDu + 0, _du0);
 				_mm256_storeu_pd(pDu + 4, _du1);
 				_mm256_storeu_pd(pDu + 8, _du2);
 				_mm256_storeu_pd(pDu + 12, _du3);
-#endif
 			}
 
 			pKer1 += nsPadded;
@@ -485,12 +445,12 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 
 				__m256d _kerval = _mm256_set1_pd(pKer2[dy]);
 
-				__m256d _du0 = _mm256_load_pd(pDu + 0);
-				__m256d _du1 = _mm256_load_pd(pDu + 4);
-				__m256d _du2 = _mm256_load_pd(pDu + 8);
-				__m256d _du3 = _mm256_load_pd(pDu + 12);
-				__m256d _du4 = _mm256_load_pd(pDu + 16);
-				__m256d _du5 = _mm256_load_pd(pDu + 20);
+				__m256d _du0 = _mm256_loadu_pd(pDu + 0);
+				__m256d _du1 = _mm256_loadu_pd(pDu + 4);
+				__m256d _du2 = _mm256_loadu_pd(pDu + 8);
+				__m256d _du3 = _mm256_loadu_pd(pDu + 12);
+				__m256d _du4 = _mm256_loadu_pd(pDu + 16);
+				__m256d _du5 = _mm256_loadu_pd(pDu + 20);
 
 				_du0 = _mm256_fmadd_pd(_kerval, _kk0, _du0);
 				_du1 = _mm256_fmadd_pd(_kerval, _kk1, _du1);
@@ -499,21 +459,12 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 				_du4 = _mm256_fmadd_pd(_kerval, _kk4, _du4);
 				_du5 = _mm256_fmadd_pd(_kerval, _kk5, _du5);
 
-#ifdef _MSC_VER
-				_mm256_store_pd(pDu + 0, _du0);
-				_mm256_store_pd(pDu + 4, _du1);
-				_mm256_store_pd(pDu + 8, _du2);
-				_mm256_store_pd(pDu + 12, _du3);
-				_mm256_store_pd(pDu + 16, _du4);
-				_mm256_store_pd(pDu + 20, _du5);
-#else
 				_mm256_storeu_pd(pDu + 0, _du0);
 				_mm256_storeu_pd(pDu + 4, _du1);
 				_mm256_storeu_pd(pDu + 8, _du2);
 				_mm256_storeu_pd(pDu + 12, _du3);
 				_mm256_storeu_pd(pDu + 16, _du4);
 				_mm256_storeu_pd(pDu + 20, _du5);
-#endif
 			}
 
 			pKer1 += nsPadded;
@@ -598,13 +549,8 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 				_du0 = _mm256_fmadd_ps(_kerval, _kk0, _du0);
 				_du1 = _mm256_fmadd_ps(_kerval, _kk1, _du1);
 
-#ifdef _MSC_VER
-				_mm256_store_ps(pDu + 0, _du0);
-				_mm256_store_ps(pDu + 8, _du1);
-#else
 				_mm256_storeu_ps(pDu + 0, _du0);
 				_mm256_storeu_ps(pDu + 8, _du1);
-#endif
 			}
 
 			pKer1 += nsPadded;
@@ -640,15 +586,9 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 				_du1 = _mm256_fmadd_ps(_kerval, _kk1, _du1);
 				_du2 = _mm256_fmadd_ps(_kerval, _kk2, _du2);
 
-#ifdef _MSC_VER
-				_mm256_store_ps(pDu + 0, _du0);
-				_mm256_store_ps(pDu + 8, _du1);
-				_mm256_store_ps(pDu + 16, _du2);
-#else
 				_mm256_storeu_ps(pDu + 0, _du0);
 				_mm256_storeu_ps(pDu + 8, _du1);
 				_mm256_storeu_ps(pDu + 16, _du2);
-#endif
 			}
 
 			pKer1 += nsPadded;
@@ -797,17 +737,10 @@ inline void spread_subproblem_3d<double>(BIGINT* sort_indices,
 					_du2 = _mm256_fmadd_pd(_kerval, _kk2, _du2);
 					_du3 = _mm256_fmadd_pd(_kerval, _kk3, _du3);
 
-#ifdef _MSC_VER
-					_mm256_store_pd(pDu + 0, _du0);
-					_mm256_store_pd(pDu + 4, _du1);
-					_mm256_store_pd(pDu + 8, _du2);
-					_mm256_store_pd(pDu + 12, _du3);
-#else
 					_mm256_storeu_pd(pDu + 0, _du0);
 					_mm256_storeu_pd(pDu + 4, _du1);
 					_mm256_storeu_pd(pDu + 8, _du2);
 					_mm256_storeu_pd(pDu + 12, _du3);
-#endif
 				}
 			}
 
@@ -859,21 +792,12 @@ inline void spread_subproblem_3d<double>(BIGINT* sort_indices,
 					_du4 = _mm256_fmadd_pd(_kerval, _kk4, _du4);
 					_du5 = _mm256_fmadd_pd(_kerval, _kk5, _du5);
 
-#ifdef _MSC_VER
-					_mm256_store_pd(pDu + 0, _du0);
-					_mm256_store_pd(pDu + 4, _du1);
-					_mm256_store_pd(pDu + 8, _du2);
-					_mm256_store_pd(pDu + 12, _du3);
-					_mm256_store_pd(pDu + 16, _du4);
-					_mm256_store_pd(pDu + 20, _du5);
-#else
 					_mm256_storeu_pd(pDu + 0, _du0);
 					_mm256_storeu_pd(pDu + 4, _du1);
 					_mm256_storeu_pd(pDu + 8, _du2);
 					_mm256_storeu_pd(pDu + 12, _du3);
 					_mm256_storeu_pd(pDu + 16, _du4);
 					_mm256_storeu_pd(pDu + 20, _du5);
-#endif
 				}
 			}
 
@@ -969,13 +893,8 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 					_du0 = _mm256_fmadd_ps(_kerval, _kk0, _du0);
 					_du1 = _mm256_fmadd_ps(_kerval, _kk1, _du1);
 
-#ifdef _MSC_VER
-					_mm256_store_ps(pDu + 0, _du0);
-					_mm256_store_ps(pDu + 8, _du1);
-#else
 					_mm256_storeu_ps(pDu + 0, _du0);
 					_mm256_storeu_ps(pDu + 8, _du1);
-#endif
 				}
 			}
 
@@ -1001,60 +920,24 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 
 			// critical inner loop:
 			for (int dz = 0; dz < ns; ++dz) {
-				// prologue
 				BIGINT oz = size1 * size2 * (i3[i] - off3 + dz);        // offset due to z
-				BIGINT j = oz + size1 * (i2[i] - off2) + i1[i] - off1;   // should be in subgrid
-				float* pDin = du + 2 * j;
+				for (int dy = 0; dy < ns; ++dy) {
+					BIGINT j = oz + size1 * (i2[i] - off2 + dy) + i1[i] - off1;   // should be in subgrid
+					float* pDu = du + 2 * j;
 
-				__m256 _kerval = _mm256_set1_ps(pKer2[0] * pKer3[dz]);
+					__m256 _kerval = _mm256_set1_ps(pKer2[dy] * pKer3[dz]);
 
-				__m256 _din0 = _mm256_loadu_ps(pDin + 0);
-				__m256 _din1 = _mm256_loadu_ps(pDin + 8);
-				__m256 _din2 = _mm256_loadu_ps(pDin + 16);
-				//loop
-				for (int dy = 1; dy < ns; ++dy) {
-					float* pDout = pDin;
+					__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+					__m256 _du1 = _mm256_loadu_ps(pDu + 8);
+					__m256 _du2 = _mm256_loadu_ps(pDu + 16);
 
-					__m256 _dout0 = _mm256_fmadd_ps(_kerval, _kk0, _din0);
-					__m256 _dout1 = _mm256_fmadd_ps(_kerval, _kk1, _din1);
-					__m256 _dout2 = _mm256_fmadd_ps(_kerval, _kk2, _din2);
+					_du0 = _mm256_fmadd_ps(_kerval, _kk0, _du0);
+					_du1 = _mm256_fmadd_ps(_kerval, _kk1, _du1);
+					_du2 = _mm256_fmadd_ps(_kerval, _kk2, _du2);
 
-					j = oz + size1 * (i2[i] - off2 + dy) + i1[i] - off1;
-					pDin = du + 2 * j;
-
-					_kerval = _mm256_set1_ps(pKer2[dy] * pKer3[dz]);
-
-					_din0 = _mm256_loadu_ps(pDin + 0);
-					_din1 = _mm256_loadu_ps(pDin + 8);
-					_din2 = _mm256_loadu_ps(pDin + 16);
-
-#ifdef _MSC_VER
-					_mm256_store_ps(pDout + 0, _dout0);
-					_mm256_store_ps(pDout + 8, _dout1);
-					_mm256_store_ps(pDout + 16, _dout2);
-#else
-					_mm256_storeu_ps(pDout + 0, _dout0);
-					_mm256_storeu_ps(pDout + 8, _dout1);
-					_mm256_storeu_ps(pDout + 16, _dout2);
-#endif
-				}
-				//epilogue
-				{
-					float* pDout = pDin;
-
-					__m256 _dout0 = _mm256_fmadd_ps(_kerval, _kk0, _din0);
-					__m256 _dout1 = _mm256_fmadd_ps(_kerval, _kk1, _din1);
-					__m256 _dout2 = _mm256_fmadd_ps(_kerval, _kk2, _din2);
-
-#ifdef _MSC_VER
-					_mm256_store_ps(pDout + 0, _dout0);
-					_mm256_store_ps(pDout + 8, _dout1);
-					_mm256_store_ps(pDout + 16, _dout2);
-#else
-					_mm256_storeu_ps(pDout + 0, _dout0);
-					_mm256_storeu_ps(pDout + 8, _dout1);
-					_mm256_storeu_ps(pDout + 16, _dout2);
-#endif
+					_mm256_storeu_ps(pDu + 0, _du0);
+					_mm256_storeu_ps(pDu + 8, _du1);
+					_mm256_storeu_ps(pDu + 16, _du2);
 				}
 			}
 

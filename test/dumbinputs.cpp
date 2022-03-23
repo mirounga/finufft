@@ -36,22 +36,22 @@ int main(int argc, char* argv[])
 
   int NN = N*N*N;         // modes F alloc size since we'll go to 3d
   // generate some "random" nonuniform points (x) and complex strengths (c):
-  FLT *x = (FLT *)malloc(sizeof(FLT)*M);
-  CPX* c = (CPX*)malloc(sizeof(CPX)*M);
+  FLT *x = (FLT *)scalable_aligned_malloc(sizeof(FLT)*M, 64);
+  CPX* c = (CPX*)scalable_aligned_malloc(sizeof(CPX)*M, 64);
   for (int j=0; j<M; ++j) {
     x[j] = PI*cos((FLT)j);                           // deterministic
     c[j] = sin((FLT)1.3*j) + IMA*cos((FLT)0.9*j);
   }
   // allocate output array F for Fourier modes, fix some type-3 coords...
-  CPX* F = (CPX*)malloc(sizeof(CPX)*NN);
-  FLT *s = (FLT*)malloc(sizeof(FLT)*N);
+  CPX* F = (CPX*)scalable_aligned_malloc(sizeof(CPX)*NN, 64);
+  FLT *s = (FLT*)scalable_aligned_malloc(sizeof(FLT)*N, 64);
   for (int k=0; k<N; ++k) s[k] = 10 * cos(1.2*k);   // normal-sized coords
-  FLT *shuge = (FLT*)malloc(sizeof(FLT)*N);
+  FLT *shuge = (FLT*)scalable_aligned_malloc(sizeof(FLT)*N, 64);
   FLT huge = 1e11;                                  // no smaller than MAX_NF
   for (int k=0; k<N; ++k) shuge[k] = huge * s[k];   // some huge coords
 
   // alloc exact output array
-  CPX* Fe = (CPX*)malloc(sizeof(CPX)*NN);
+  CPX* Fe = (CPX*)scalable_aligned_malloc(sizeof(CPX)*NN, 64);
  
   // some useful debug printing...
   //for (int k=0;k<N;++k) printf("F[%d] = %g+%gi\n",k,real(F[k]),imag(F[k]));
@@ -113,8 +113,8 @@ int main(int argc, char* argv[])
   printf("1d3 XK prod too big:\tier=%d (should complain)\n",ier);
 
   int ndata = 10;                 // how many multiple vectors to test it on
-  CPX* cm = (CPX*)malloc(sizeof(CPX)*M*ndata);
-  CPX* Fm = (CPX*)malloc(sizeof(CPX)*NN*ndata);     // the biggest array
+  CPX* cm = (CPX*)scalable_aligned_malloc(sizeof(CPX)*M*ndata, 64);
+  CPX* Fm = (CPX*)scalable_aligned_malloc(sizeof(CPX)*NN*ndata, 64);     // the biggest array
   for (int j=0; j<M*ndata; ++j) cm[j] = sin((FLT)1.3*j) + IMA*cos((FLT)0.9*j); // set cm for 1d1many
   ier = FINUFFT1D1MANY(0,M,x,cm,+1,0,N,Fm,&opts);
   printf("1d1many ndata=0:\tier=%d (should complain)\n",ier);
@@ -328,7 +328,9 @@ int main(int argc, char* argv[])
   ier = FINUFFT3D3MANY(ndata,M,x,x,x,c,+1,acc,N,shuge,shuge,shuge,Fm,&opts);
   printf("3d3many XK prod too big:\tier=%d (should complain)\n",ier);
   
-  free(x); free(c); free(F); free(s); free(shuge); free(cm); free(Fm);
+  scalable_aligned_free(x); scalable_aligned_free(c); scalable_aligned_free(F);
+  scalable_aligned_free(s); scalable_aligned_free(shuge);
+  scalable_aligned_free(cm); scalable_aligned_free(Fm);
   printf("freed.\n");
   
   // some dumb tests for guru interface to induce free() crash in destroy...
