@@ -866,6 +866,40 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 	__m256i _spreadhi = _mm256_set_epi32(7, 7, 6, 6, 5, 5, 4, 4);
 
 	switch (nsPadded) {
+	case 4:
+		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			// Combine kernel with complex source value
+			BIGINT si = sort_indices[i];
+			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
+			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
+
+			__m256 _k0 = _mm256_castps128_ps256(_mm_loadu_ps(pKer1));
+
+			__m256 _kk0 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k0, _spreadlo));
+
+			// critical inner loop:
+			for (int dz = 0; dz < ns; ++dz) {
+				BIGINT oz = size1 * size2 * (i3[i] - off3 + dz);        // offset due to z
+				for (int dy = 0; dy < ns; ++dy) {
+					BIGINT j = oz + size1 * (i2[i] - off2 + dy) + i1[i] - off1;   // should be in subgrid
+					float* pDu = du + 2 * j;
+
+					__m256 _kerval = _mm256_set1_ps(pKer2[dy] * pKer3[dz]);
+
+					__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+
+					_du0 = _mm256_fmadd_ps(_kerval, _kk0, _du0);
+
+					_mm256_storeu_ps(pDu + 0, _du0);
+				}
+			}
+
+			pKer1 += nsPadded;
+			pKer2 += nsPadded;
+			pKer3 += nsPadded;
+		}
+		break;
+
 	case 8:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
@@ -873,7 +907,7 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
 			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
 
-			__m256 _k0 = _mm256_loadu_ps(pKer1 + 0);
+			__m256 _k0 = _mm256_load_ps(pKer1 + 0);
 
 			__m256 _kk0 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k0, _spreadlo));
 			__m256 _kk1 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k0, _spreadhi));
@@ -947,29 +981,44 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 		}
 		break;
 
-	default:
+	case 16:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
-			float re0 = dd[2 * si];
-			float im0 = dd[2 * si + 1];
+			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
+			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
 
-			// Combine kernel with complex source value to simplify inner loop
-			float ker1val[2 * MAX_NSPREAD];    // here 2* is because of complex
-			for (int j = 0; j < ns; j++) {
-				ker1val[2 * j] = re0 * pKer1[j];
-				ker1val[2 * j + 1] = im0 * pKer1[j];
-			}
+			__m256 _k0 = _mm256_load_ps(pKer1 + 0);
+			__m256 _k2 = _mm256_load_ps(pKer1 + 8);
+
+			__m256 _kk0 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k0, _spreadlo));
+			__m256 _kk1 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k0, _spreadhi));
+			__m256 _kk2 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k2, _spreadlo));
+			__m256 _kk3 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k2, _spreadhi));
 
 			// critical inner loop:
 			for (int dz = 0; dz < ns; ++dz) {
 				BIGINT oz = size1 * size2 * (i3[i] - off3 + dz);        // offset due to z
 				for (int dy = 0; dy < ns; ++dy) {
 					BIGINT j = oz + size1 * (i2[i] - off2 + dy) + i1[i] - off1;   // should be in subgrid
-					float kerval = pKer2[dy] * pKer3[dz];
-					float* trg = du + 2 * j;
-					for (int dx = 0; dx < 2 * ns; ++dx) {
-						trg[dx] += kerval * ker1val[dx];
-					}
+					float* pDu = du + 2 * j;
+
+					__m256 _kerval = _mm256_set1_ps(pKer2[dy] * pKer3[dz]);
+
+					__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+					__m256 _du1 = _mm256_loadu_ps(pDu + 8);
+					__m256 _du2 = _mm256_loadu_ps(pDu + 16);
+					__m256 _du3 = _mm256_loadu_ps(pDu + 24);
+
+					_du0 = _mm256_fmadd_ps(_kerval, _kk0, _du0);
+					_du1 = _mm256_fmadd_ps(_kerval, _kk1, _du1);
+					_du2 = _mm256_fmadd_ps(_kerval, _kk2, _du2);
+					_du3 = _mm256_fmadd_ps(_kerval, _kk3, _du3);
+
+					_mm256_storeu_ps(pDu + 0, _du0);
+					_mm256_storeu_ps(pDu + 8, _du1);
+					_mm256_storeu_ps(pDu + 16, _du2);
+					_mm256_storeu_ps(pDu + 24, _du3);
 				}
 			}
 
@@ -977,6 +1026,10 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 			pKer2 += nsPadded;
 			pKer3 += nsPadded;
 		}
+		break;
+
+	default:
+		// Should never get here
 		break;
 	}
 }
