@@ -100,8 +100,9 @@ In older distros you may have to compile ``octave`` from source to get the neede
 
 You should then compile and test the library via various ``make`` tasks, eg::
 
-  git clone https://github.com/flatironinstitute/finufft.git
+  git clone https://github.com/mirounga/finufft.git
   cd finufft
+  git checkout rs_avx2
   . /opt/intel/oneapi/setvars.sh
   make test -j
   
