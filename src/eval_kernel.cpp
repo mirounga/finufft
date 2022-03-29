@@ -24,10 +24,10 @@ void eval_kernel_bulk_generic(float* c, float* kernel_vals, float* x1, const BIG
 		// main loop
 		for (BIGINT i = 0; i < size4; i += 4)
 		{
-			__m256 _x_a = _mm256_set1_ps(x1[i+0]);
-			__m256 _x_b = _mm256_set1_ps(x1[i+1]);
-			__m256 _x_c = _mm256_set1_ps(x1[i+2]);
-			__m256 _x_d = _mm256_set1_ps(x1[i+3]);
+			__m256 _x_a = _mm256_set1_ps(x1[i + 0]);
+			__m256 _x_b = _mm256_set1_ps(x1[i + 1]);
+			__m256 _x_c = _mm256_set1_ps(x1[i + 2]);
+			__m256 _x_d = _mm256_set1_ps(x1[i + 3]);
 
 			// scale so local grid offset z in [-1,1]
 			__m256 _z_a = _mm256_fmadd_ps(_x_a, _two, _ns_m_1);
@@ -83,7 +83,7 @@ void eval_kernel_bulk_generic(float* c, float* kernel_vals, float* x1, const BIG
 				_k_a = _mm256_fmadd_ps(_k_a, _z_a, _c);
 			}
 
-			_mm256_store_ps(ker, _k_a); 
+			_mm256_store_ps(ker, _k_a);
 			ker += 8;
 		}
 	}
@@ -99,10 +99,10 @@ void eval_kernel_bulk_generic(float* c, float* kernel_vals, float* x1, const BIG
 		// main loop
 		for (BIGINT i = 0; i < size4; i += 4)
 		{
-			__m256 _x_a = _mm256_set1_ps(x1[i+0]);
-			__m256 _x_b = _mm256_set1_ps(x1[i+1]);
-			__m256 _x_c = _mm256_set1_ps(x1[i+2]);
-			__m256 _x_d = _mm256_set1_ps(x1[i+3]);
+			__m256 _x_a = _mm256_set1_ps(x1[i + 0]);
+			__m256 _x_b = _mm256_set1_ps(x1[i + 1]);
+			__m256 _x_c = _mm256_set1_ps(x1[i + 2]);
+			__m256 _x_d = _mm256_set1_ps(x1[i + 3]);
 
 			// scale so local grid offset z in [-1,1]
 			__m256 _z_a = _mm256_fmadd_ps(_x_a, _two, _ns_m_1);
@@ -175,7 +175,7 @@ void eval_kernel_bulk_generic(float* c, float* kernel_vals, float* x1, const BIG
 				_k_a1 = _mm_fmadd_ps(_k_a1, _mm256_castps256_ps128(_z_a), _c1);
 			}
 
-			_mm256_storeu_ps(ker, _k_a0); 
+			_mm256_storeu_ps(ker, _k_a0);
 			_mm_store_ps(ker + 8, _k_a1);
 			ker += 12;
 		}
@@ -252,13 +252,13 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 				_k_d0 = _mm256_fmadd_pd(_k_d0, _z_d, _c0);
 			}
 
-			_mm256_store_pd(ker + 0, _k_a0); 
+			_mm256_store_pd(ker + 0, _k_a0);
 			ker += nsPadded;
 
 			_mm256_store_pd(ker + 0, _k_b0);
 			ker += nsPadded;
 
-			_mm256_store_pd(ker + 0, _k_c0); 
+			_mm256_store_pd(ker + 0, _k_c0);
 			ker += nsPadded;
 
 			_mm256_store_pd(ker + 0, _k_d0);
@@ -283,7 +283,7 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 				_k_a0 = _mm256_fmadd_pd(_k_a0, _z_a, _c0);
 			}
 
-			_mm256_store_pd(ker + 0, _k_a0); 
+			_mm256_store_pd(ker + 0, _k_a0);
 			ker += nsPadded;
 		}
 	}
@@ -323,12 +323,12 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 				_k_b1 = _mm256_fmadd_pd(_k_b1, _z_b, _c1);
 			}
 
-			_mm256_store_pd(ker + 0, _k_a0); 
-			_mm256_store_pd(ker + 4, _k_a1); 
+			_mm256_store_pd(ker + 0, _k_a0);
+			_mm256_store_pd(ker + 4, _k_a1);
 			ker += nsPadded;
 
 			_mm256_store_pd(ker + 0, _k_b0);
-			_mm256_store_pd(ker + 4, _k_b1); 
+			_mm256_store_pd(ker + 4, _k_b1);
 			ker += nsPadded;
 		}
 
@@ -353,8 +353,8 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 				_k_a1 = _mm256_fmadd_pd(_k_a1, _z_a, _c1);
 			}
 
-			_mm256_store_pd(ker + 0, _k_a0); 
-			_mm256_store_pd(ker + 4, _k_a1); 
+			_mm256_store_pd(ker + 0, _k_a0);
+			_mm256_store_pd(ker + 4, _k_a1);
 			ker += nsPadded;
 		}
 	}
@@ -398,14 +398,14 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 				_k_b2 = _mm256_fmadd_pd(_k_b2, _z_b, _c2);
 			}
 
-			_mm256_store_pd(ker + 0, _k_a0); 
-			_mm256_store_pd(ker + 4, _k_a1); 
-			_mm256_store_pd(ker + 8, _k_a2); 
+			_mm256_store_pd(ker + 0, _k_a0);
+			_mm256_store_pd(ker + 4, _k_a1);
+			_mm256_store_pd(ker + 8, _k_a2);
 			ker += nsPadded;
 
 			_mm256_store_pd(ker + 0, _k_b0);
-			_mm256_store_pd(ker + 4, _k_b1); 
-			_mm256_store_pd(ker + 8, _k_b2); 
+			_mm256_store_pd(ker + 4, _k_b1);
+			_mm256_store_pd(ker + 8, _k_b2);
 			ker += nsPadded;
 		}
 
@@ -433,9 +433,9 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 				_k_a2 = _mm256_fmadd_pd(_k_a2, _z_a, _c2);
 			}
 
-			_mm256_store_pd(ker + 0, _k_a0); 
-			_mm256_store_pd(ker + 4, _k_a1); 
-			_mm256_store_pd(ker + 8, _k_a2); 
+			_mm256_store_pd(ker + 0, _k_a0);
+			_mm256_store_pd(ker + 4, _k_a1);
+			_mm256_store_pd(ker + 8, _k_a2);
 			ker += nsPadded;
 		}
 	}
@@ -473,10 +473,10 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 				_k_a3 = _mm256_fmadd_pd(_k_a3, _z_a, _c3);
 			}
 
-			_mm256_store_pd(ker + 0, _k_a0); 
-			_mm256_store_pd(ker + 4, _k_a1); 
-			_mm256_store_pd(ker + 8, _k_a2); 
-			_mm256_store_pd(ker + 12, _k_a3); 
+			_mm256_store_pd(ker + 0, _k_a0);
+			_mm256_store_pd(ker + 4, _k_a1);
+			_mm256_store_pd(ker + 8, _k_a2);
+			_mm256_store_pd(ker + 12, _k_a3);
 			ker += nsPadded;
 		}
 	}
@@ -506,6 +506,167 @@ void eval_kernel_bulk_generic(double* c, double* kernel_vals, double* x1, const 
 		}
 	}
 }
+#ifdef __AVX512F__
+template<>
+inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float* x1, const BIGINT size)
+{
+	__m512 _two = _mm512_set1_ps(2.0f);
+	__m512 _ns_m_1 = _mm512_set1_ps(6.0f);
+
+	BIGINT size16 = size - size % 16;
+
+	float* ker = kernel_vals;
+
+	__m512 _c0 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 0));
+	__m512 _c1 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 8));
+	__m512 _c2 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 16));
+	__m512 _c3 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 24));
+	__m512 _c4 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 32));
+	__m512 _c5 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 40));
+	__m512 _c6 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 48));
+	__m512 _c7 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 56));
+	__m512 _c8 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 64));
+	__m512 _c9 = _mm512_broadcast_f32x8(_mm256_load_ps(c + 72));
+
+	// main loop
+	for (BIGINT i = 0; i < size16; i += 16)
+	{
+		__m512 _x_ab = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 0]), _mm256_set1_ps(x1[i + 1]), 1);
+		__m512 _x_cd = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 2]), _mm256_set1_ps(x1[i + 3]), 1);
+		__m512 _x_ef = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 4]), _mm256_set1_ps(x1[i + 5]), 1);
+		__m512 _x_gh = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 6]), _mm256_set1_ps(x1[i + 7]), 1);
+		__m512 _x_ij = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 8]), _mm256_set1_ps(x1[i + 9]), 1);
+		__m512 _x_kl = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 10]), _mm256_set1_ps(x1[i + 11]), 1);
+		__m512 _x_mn = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 12]), _mm256_set1_ps(x1[i + 13]), 1);
+		__m512 _x_op = _mm512_insertf32x8(_mm512_set1_ps(x1[i + 14]), _mm256_set1_ps(x1[i + 15]), 1);
+
+		// scale so local grid offset z in [-1,1]
+		__m512 _z_ab = _mm512_fmadd_ps(_x_ab, _two, _ns_m_1);
+		__m512 _z_cd = _mm512_fmadd_ps(_x_cd, _two, _ns_m_1);
+		__m512 _z_ef = _mm512_fmadd_ps(_x_ef, _two, _ns_m_1);
+		__m512 _z_gh = _mm512_fmadd_ps(_x_gh, _two, _ns_m_1);
+		__m512 _z_ij = _mm512_fmadd_ps(_x_ij, _two, _ns_m_1);
+		__m512 _z_kl = _mm512_fmadd_ps(_x_kl, _two, _ns_m_1);
+		__m512 _z_mn = _mm512_fmadd_ps(_x_mn, _two, _ns_m_1);
+		__m512 _z_op = _mm512_fmadd_ps(_x_op, _two, _ns_m_1);
+
+		__m512 _k_ab = _mm512_fmadd_ps(_c9, _z_ab, _c8);
+		__m512 _k_cd = _mm512_fmadd_ps(_c9, _z_cd, _c8);
+		__m512 _k_ef = _mm512_fmadd_ps(_c9, _z_ef, _c8);
+		__m512 _k_gh = _mm512_fmadd_ps(_c9, _z_gh, _c8);
+		__m512 _k_ij = _mm512_fmadd_ps(_c9, _z_ij, _c8);
+		__m512 _k_kl = _mm512_fmadd_ps(_c9, _z_kl, _c8);
+		__m512 _k_mn = _mm512_fmadd_ps(_c9, _z_mn, _c8);
+		__m512 _k_op = _mm512_fmadd_ps(_c9, _z_op, _c8);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c7);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c7);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c7);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c7);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c7);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c7);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c7);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c7);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c6);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c6);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c6);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c6);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c6);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c6);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c6);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c6);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c5);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c5);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c5);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c5);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c5);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c5);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c5);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c5);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c4);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c4);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c4);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c4);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c4);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c4);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c4);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c4);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c3);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c3);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c3);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c3);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c3);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c3);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c3);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c3);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c2);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c2);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c2);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c2);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c2);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c2);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c2);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c2);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c1);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c1);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c1);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c1);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c1);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c1);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c1);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c1);
+
+		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c0);
+		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c0);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c0);
+		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c0);
+		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c0);
+		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c0);
+		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c0);
+		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c0);
+
+		_mm512_store_ps(ker + 0, _k_ab);
+		_mm512_store_ps(ker + 16, _k_cd);
+		_mm512_store_ps(ker + 32, _k_ef);
+		_mm512_store_ps(ker + 48, _k_gh);
+		_mm512_store_ps(ker + 64, _k_ij);
+		_mm512_store_ps(ker + 80, _k_kl);
+		_mm512_store_ps(ker + 96, _k_mn);
+		_mm512_store_ps(ker + 112, _k_op);
+
+		ker += 128;
+	}
+
+	// short tail
+	for (BIGINT i = size16; i < size; i++)
+	{
+		__m512 _x_a = _mm512_set1_ps(x1[i]);
+		// scale so local grid offset z in [-1,1]
+		__m512 _z_a = _mm512_fmadd_ps(_x_a, _two, _ns_m_1);
+
+		__m512 _k_a = _mm512_fmadd_ps(_c9, _z_a, _c8);
+
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c7);
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c6);
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c5);
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c4);
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c3);
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c2);
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c1);
+		_k_a = _mm512_fmadd_ps(_k_a, _z_a, _c0);
+
+		_mm256_store_ps(ker, _mm512_castps512_ps256(_k_a));
+
+		ker += 8;
+	}
+}
+#endif
 #else
 template<int ns, int np>
 void eval_kernel_bulk_generic(FLT* c, FLT* kernel_vals, FLT* x1, const BIGINT size)
@@ -563,7 +724,7 @@ void eval_kernel_bulk_Horner(FLT* kernel_vals, FLT* x1, const int w, const BIGIN
 		-1.5608307370340880E+01f, 9.5627412100260845E+00f, 9.5627412100260205E+00f, -1.5608307370340908E+01f,
 		-4.5715207776748699E+00f, 7.9904373067895493E+00f, -7.9904373067893877E+00f, 4.5715207776749462E+00f };
 
-	alignas(64) FLT c1255[] = { 
+	alignas(64) FLT c1255[] = {
 		2.4106943677442615E+02f, 4.3538384278025542E+03f, 9.3397486707381995E+03f, 4.3538384278025515E+03f, 2.4106943677442607E+02f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
 		5.8781364250328272E+02f, 3.4742855804122028E+03f, -7.3041306797303120E-14f, -3.4742855804122009E+03f, -5.8781364250328249E+02f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
 		5.1234107167555862E+02f, 3.5219546517037116E+02f, -1.7076861141633149E+03f, 3.5219546517037247E+02f, 5.1234107167555862E+02f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
@@ -572,7 +733,7 @@ void eval_kernel_bulk_Horner(FLT* kernel_vals, FLT* x1, const int w, const BIGIN
 		-1.4207955403641256E+01f, 1.6019466986221790E+01f, 5.4386376890865855E-13f, -1.6019466986220916E+01f, 1.4207955403641320E+01f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
 		-2.1966493586753826E+00f, 5.0672636163194582E+00f, -6.7340544905090631E+00f, 5.0672636163189448E+00f, -2.1966493586753089E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00 };
 
-	alignas(64) FLT c1256[] = { 
+	alignas(64) FLT c1256[] = {
 		4.3011762559089101E+02f, 1.3368828836127070E+04f, 4.9861340433371224E+04f, 4.9861340433371253E+04f, 1.3368828836127073E+04f, 4.3011762559835148E+02f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
 		1.1857225840065141E+03f, 1.4112553227730617E+04f, 1.5410005180819440E+04f, -1.5410005180819426E+04f, -1.4112553227730616E+04f, -1.1857225839984601E+03f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
 		1.2460481448413077E+03f, 4.3127030215084960E+03f, -5.5438591621431169E+03f, -5.5438591621431306E+03f, 4.3127030215084960E+03f, 1.2460481448488902E+03f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
@@ -605,7 +766,7 @@ void eval_kernel_bulk_Horner(FLT* kernel_vals, FLT* x1, const int w, const BIGIN
 		-1.7448292513542445E+00f, 4.8577330433956609E+00f, -6.8794163043773890E+00f, 3.4611708987408365E+00f, 3.4611708985348386E+00f, -6.8794163043605385E+00f, 4.8577330433771184E+00f, -1.7448292513550807E+00f,
 		1.5044951479021193E-01f, 9.6230159355094713E-02f, -7.0399250398052082E-01f, 1.3251401132916929E+00f, -1.3251401128795544E+00f, 7.0399250407339709E-01f, -9.6230159355094713E-02f, -1.5044951479003055E-01 };
 
-	alignas(64) FLT c1259[] = { 
+	alignas(64) FLT c1259[] = {
 		1.8793738965776997E+03f, 2.1220891582018419E+05f, 2.5233246441351641E+06f, 9.2877384983420596E+06f, 1.4015330434461458E+07f, 9.2877384983420689E+06f, 2.5233246441351632E+06f, 2.1220891582018507E+05f, 1.8793738965777015E+03f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
 		6.6675066501609344E+03f, 3.4704155240986997E+05f, 2.2890184838322559E+06f, 3.8705035445351214E+06f, -1.6037058324963857E-09f, -3.8705035445351251E+06f, -2.2890184838322555E+06f, -3.4704155240987107E+05f, -6.6675066501609363E+03f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
 		9.8412775404612330E+03f, 2.3171563090202375E+05f, 6.8167589492092200E+05f, -2.1140963571671984E+05f, -1.4236515118873848E+06f, -2.1140963571672366E+05f, 6.8167589492092165E+05f, 2.3171563090202425E+05f, 9.8412775404612312E+03f, 0.0000000000000000E+00f, 0.0000000000000000E+00f, 0.0000000000000000E+00f,
