@@ -314,7 +314,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 			// offset rel to subgrid, starts the output indices
 			float* pDu = du + 2 * (i1[i] - off1);
 
-			__m256 _k0 = _mm256_load_ps(pKer1 + 0);
+			__m256 _k0 = _mm256_loadu_ps(pKer1 + 0);
 			__m256 _k2 = _mm256_castps128_ps256(_mm_load_ps(pKer1 + 8));
 
 			__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);

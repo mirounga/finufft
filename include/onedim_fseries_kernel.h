@@ -259,6 +259,7 @@ void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_opts opt
         });
 }
 
+/*
 template<>
 void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
 {
@@ -445,5 +446,6 @@ void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
         });
 
 }
+*/
 #endif
 #endif
