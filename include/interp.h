@@ -1,6 +1,8 @@
 #ifndef INTERP_H
 #define INTERP_H
 
+#include <immintrin.h>
+
 template<class T>
 void interp_line(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 	T* kernel_vals1,
@@ -39,8 +41,6 @@ void interp_line(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 }
 
 #ifdef __AVX2__
-#include <immintrin.h>
-
 template<>
 inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, double* du_padded,
 	double* kernel_vals1,
@@ -53,7 +53,8 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 	// main loop over NU targs, interp each from U
 	double* pKer = kernel_vals1 + begin * nsPadded;
 
-	if (nsPadded == 8) {
+	switch (nsPadded) {
+	case 8:
 		for (BIGINT i = begin; i < end; i++)
 		{
 			double* pDu = du_padded + 2 * i1[i];
@@ -91,8 +92,8 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 
 			pKer += nsPadded;
 		}
-	}
-	if (nsPadded == 12) {
+		break;
+	case 12:
 		for (BIGINT i = begin; i < end; i++)
 		{
 			double* pDu = du_padded + 2 * i1[i];
@@ -139,8 +140,8 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 
 			pKer += nsPadded;
 		}
-	}
-	if (nsPadded == 16) {
+		break;
+	case 16:
 		for (BIGINT i = begin; i < end; i++)
 		{
 			double* pDu = du_padded + 2 * i1[i];
@@ -196,8 +197,8 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 
 			pKer += nsPadded;
 		}
-	}
-	else {
+		break;
+	default:
 		for (BIGINT i = begin; i < end; i++)
 		{
 			__m128d _out0 = _mm_setzero_pd();
@@ -221,6 +222,7 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 
 			pKer += nsPadded;
 		}
+		break;
 	}
 }
 

@@ -1,6 +1,7 @@
 #ifndef SPREAD_H
 #define SPREAD_H
 
+#include <immintrin.h>
 #include <tbb/scalable_allocator.h>
 
 template<class T>
@@ -56,7 +57,6 @@ void spread_subproblem_1d(BIGINT* sort_indices, BIGINT off1, BIGINT size1, T* du
 }
 
 #ifdef __AVX2__
-#include <immintrin.h>
 
 template<>
 inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGINT size1, double* du, double* dd,
@@ -257,6 +257,28 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 	__m256i _spreadhi = _mm256_set_epi32(7, 7, 6, 6, 5, 5, 4, 4);
 
 	switch (nsPadded) {
+	case 4:
+		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			BIGINT si = sort_indices[i];
+			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
+			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
+
+			// offset rel to subgrid, starts the output indices
+			float* pDu = du + 2 * (i1[i] - off1);
+
+			__m256 _k0 = _mm256_castps128_ps256(_mm_load_ps(pKer1 + 0));
+
+			__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
+
+			__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+
+			_du0 = _mm256_fmadd_ps(_dd0, _kk0, _du0);
+
+			_mm256_storeu_ps(pDu + 0, _du0);
+
+			pKer1 += nsPadded;
+		}
+		break;
 	case 8:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
@@ -283,26 +305,74 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 			pKer1 += nsPadded;
 		}
 		break;
-	default:
+	case 12:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
-			__m256 _dd0 = _mm256_maskload_ps(dd + 2 * si, _mask);
+			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
+			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
 
 			// offset rel to subgrid, starts the output indices
 			float* pDu = du + 2 * (i1[i] - off1);
 
-			// critical inner loop:
-			for (int dx = 0; dx < ns; ++dx) {
-				__m256 _kk0 = _mm256_set1_ps(pKer1[dx]);
-				__m256 _du0 = _mm256_maskload_ps(pDu, _mask);
-				_du0 = _mm256_fmadd_ps(_dd0, _kk0, _du0);
-				_mm256_maskstore_ps(pDu, _mask, _du0);
+			__m256 _k0 = _mm256_load_ps(pKer1 + 0);
+			__m256 _k2 = _mm256_castps128_ps256(_mm_load_ps(pKer1 + 8));
 
-				pDu += 2;
-			}
+			__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
+			__m256 _kk1 = _mm256_permutevar8x32_ps(_k0, _spreadhi);
+			__m256 _kk2 = _mm256_permutevar8x32_ps(_k2, _spreadlo);
+
+			__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+			__m256 _du1 = _mm256_loadu_ps(pDu + 8);
+			__m256 _du2 = _mm256_loadu_ps(pDu + 16);
+
+			_du0 = _mm256_fmadd_ps(_dd0, _kk0, _du0);
+			_du1 = _mm256_fmadd_ps(_dd0, _kk1, _du1);
+			_du2 = _mm256_fmadd_ps(_dd0, _kk2, _du2);
+
+			_mm256_storeu_ps(pDu + 0, _du0);
+			_mm256_storeu_ps(pDu + 8, _du1);
+			_mm256_storeu_ps(pDu + 16, _du2);
 
 			pKer1 += nsPadded;
 		}
+		break;
+	case 16:
+		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			BIGINT si = sort_indices[i];
+			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
+			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
+
+			// offset rel to subgrid, starts the output indices
+			float* pDu = du + 2 * (i1[i] - off1);
+
+			__m256 _k0 = _mm256_load_ps(pKer1 + 0);
+			__m256 _k2 = _mm256_load_ps(pKer1 + 8);
+
+			__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
+			__m256 _kk1 = _mm256_permutevar8x32_ps(_k0, _spreadhi);
+			__m256 _kk2 = _mm256_permutevar8x32_ps(_k2, _spreadlo);
+			__m256 _kk3 = _mm256_permutevar8x32_ps(_k2, _spreadhi);
+
+			__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+			__m256 _du1 = _mm256_loadu_ps(pDu + 8);
+			__m256 _du2 = _mm256_loadu_ps(pDu + 16);
+			__m256 _du3 = _mm256_loadu_ps(pDu + 24);
+
+			_du0 = _mm256_fmadd_ps(_dd0, _kk0, _du0);
+			_du1 = _mm256_fmadd_ps(_dd0, _kk1, _du1);
+			_du2 = _mm256_fmadd_ps(_dd0, _kk2, _du2);
+			_du3 = _mm256_fmadd_ps(_dd0, _kk3, _du3);
+
+			_mm256_storeu_ps(pDu + 0, _du0);
+			_mm256_storeu_ps(pDu + 8, _du1);
+			_mm256_storeu_ps(pDu + 16, _du2);
+			_mm256_storeu_ps(pDu + 24, _du3);
+
+			pKer1 += nsPadded;
+		}
+		break;
+	default:
+		// Should never get here
 		break;
 	}
 }
