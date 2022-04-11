@@ -1015,16 +1015,17 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
+			__m256 _ker1 = _mm256_castps128_ps256(_mm_load_ps(pKer1 + 0));
+			__m256 _kk0 = _mm256_permutevar8x32_ps(_ker1, _spreadlo);
+
 			for (int dy = 0; dy < ns; dy++) {
 				float* pDu0 = du_padded + 2 * (paddedN1 * (i2[i] + dy) + i1[i]);
 
 				__m256 _ker2 = _mm256_set1_ps(pKer2[dy]);
-				__m256 _ker1 = _mm256_castps128_ps256(_mm_load_ps(pKer1 + 0));
-				__m256 _k0 = _mm256_mul_ps(_ker2, _ker1);
+				__m256 _k0 = _mm256_mul_ps(_ker2, _kk0);
 
-				__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
 				__m256 _du0 = _mm256_loadu_ps(pDu0 + 0);
-				_out0 = _mm256_fmadd_ps(_kk0, _du0, _out0);
+				_out0 = _mm256_fmadd_ps(_k0, _du0, _out0);
 			}
 
 			_out0 = _mm256_add_ps(_out0,

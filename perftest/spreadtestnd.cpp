@@ -3,13 +3,16 @@
 #include <utils.h>
 #include <utils_precindep.h>
 
-#include <vector>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 
 #include <tbb/tbb.h>
 #include <mkl_vsl.h>
+
+#undef max
+#include <algorithm>
 
 void usage()
 {
@@ -95,7 +98,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  tbb::global_control thread_limit(tbb::global_control::max_allowed_parallelism, 1);
+  //tbb::global_control thread_limit(tbb::global_control::max_allowed_parallelism, 1);
 
   int dodir1 = true;                        // control if dir=1 tested at all
   BIGINT N = (BIGINT)round(pow(roughNg,1.0/d));     // Fourier grid size per dim
@@ -225,12 +228,13 @@ int main(int argc, char* argv[])
         });
 
     CPX p = kersum*str;   // pred ans, complex mult
-    FLT maxerr = max(abs(sum.real()-p.real()), abs(sum.imag()-p.imag()));
+    FLT maxerr = std::max(abs(sum.real()-p.real()), abs(sum.imag()-p.imag()));
     FLT ansmod = abs(sum);
     printf("    rel err in total over grid:      %.3g\n",maxerr/ansmod);
     // note this is weaker than below dir=2 test, but is good indicator that
     // periodic wrapping is correct
   }
+  return 0;
 
   // test direction 2 (U -> NU interpolation) ..............................
   printf("making more random NU pts...\n");
@@ -279,7 +283,7 @@ int main(int argc, char* argv[])
   // math test is worst-case error from pred value (kersum) on interp pts:
   maxerr = 0.0;
   for (BIGINT i=0;i<M;++i) {
-    FLT err = max(abs(d_nonuniform[2*i]-kersum.real()),
+    FLT err = std::max(abs(d_nonuniform[2*i]-kersum.real()),
 		       abs(d_nonuniform[2*i+1]-kersum.imag()));
     if (err>maxerr) maxerr=err;
   }

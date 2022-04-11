@@ -139,11 +139,11 @@ void eval_kernel_bulk_generic(float* c, float* kernel_vals, float* x1, const BIG
 				_k_d1 = _mm_fmadd_ps(_k_d1, _mm256_castps256_ps128(_z_d), _c1);
 			}
 
-			_mm256_store_ps(ker + 0, _k_a0);
+			_mm256_storeu_ps(ker + 0, _k_a0);
 			_mm_store_ps(ker + 8, _k_a1);
 			_mm256_storeu_ps(ker + 12, _k_b0);
 			_mm_store_ps(ker + 20, _k_b1);
-			_mm256_store_ps(ker + 24, _k_c0);
+			_mm256_storeu_ps(ker + 24, _k_c0);
 			_mm_store_ps(ker + 32, _k_c1);
 			_mm256_storeu_ps(ker + 36, _k_d0);
 			_mm_store_ps(ker + 44, _k_d1);

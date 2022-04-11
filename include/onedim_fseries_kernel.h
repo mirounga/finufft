@@ -241,10 +241,10 @@ void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_opts opt
                     pNim += 4;
                 }
 
-                _mm256_store_pd(fwkerhalf + j + 0, _x0);
-                _mm256_store_pd(fwkerhalf + j + 4, _x1);
-                _mm256_store_pd(fwkerhalf + j + 8, _x2);
-                _mm256_store_pd(fwkerhalf + j + 12, _x3);
+                _mm256_storeu_pd(fwkerhalf + j + 0, _x0);
+                _mm256_storeu_pd(fwkerhalf + j + 4, _x1);
+                _mm256_storeu_pd(fwkerhalf + j + 8, _x2);
+                _mm256_storeu_pd(fwkerhalf + j + 12, _x3);
             }
 
             for (BIGINT j = end16, jj = 0; j < end; ++j, ++jj) {
@@ -259,7 +259,6 @@ void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_opts opt
         });
 }
 
-/*
 template<>
 void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
 {
@@ -428,10 +427,10 @@ void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
                     pNim += 8;
                 }
 
-                _mm256_store_ps(fwkerhalf + j + 0, _x0);
-                _mm256_store_ps(fwkerhalf + j + 8, _x1);
-                _mm256_store_ps(fwkerhalf + j + 16, _x2);
-                _mm256_store_ps(fwkerhalf + j + 24, _x3);
+                _mm256_storeu_ps(fwkerhalf + j + 0, _x0);
+                _mm256_storeu_ps(fwkerhalf + j + 8, _x1);
+                _mm256_storeu_ps(fwkerhalf + j + 16, _x2);
+                _mm256_storeu_ps(fwkerhalf + j + 24, _x3);
             }
 
             for (BIGINT j = end32, jj = 0; j < end; ++j, ++jj) {// loop along output array
@@ -446,6 +445,5 @@ void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
         });
 
 }
-*/
 #endif
 #endif
