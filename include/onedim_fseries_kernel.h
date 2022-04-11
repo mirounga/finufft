@@ -9,8 +9,6 @@ extern "C" {
 
 #include <tbb/tbb.h>
 #include <immintrin.h>
-#include <cassert>
-#include <iostream>
 
 template<class T>
 void onedim_fseries_kernel(BIGINT nf, T* fwkerhalf, spread_opts opts)
@@ -138,10 +136,10 @@ void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_opts opt
                 __m256d _ap_im = _mm256_set1_pd(ap.imag());
 
                 {
-                    __m256d _bj_re0 = _mm256_load_pd(pBre + 0);
-                    __m256d _bj_im0 = _mm256_load_pd(pBim + 0);
-                    __m256d _bj_re1 = _mm256_load_pd(pBre + 4);
-                    __m256d _bj_im1 = _mm256_load_pd(pBim + 4);
+                    __m256d _bj_re0 = _mm256_loadu_pd(pBre + 0);
+                    __m256d _bj_im0 = _mm256_loadu_pd(pBim + 0);
+                    __m256d _bj_re1 = _mm256_loadu_pd(pBre + 4);
+                    __m256d _bj_im1 = _mm256_loadu_pd(pBim + 4);
 
                     __m256d _aj_re0 = _mm256_fmsub_pd(_bj_re0, _ap_re, _mm256_mul_pd(_bj_im0, _ap_im));
                     __m256d _aj_im0 = _mm256_fmadd_pd(_bj_re0, _ap_im, _mm256_mul_pd(_bj_im0, _ap_re));
@@ -154,10 +152,10 @@ void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_opts opt
                     _mm256_store_pd(pAim + 4, _aj_im1);
                 }
                 {
-                    __m256d _bj_re2 = _mm256_load_pd(pBre + 8);
-                    __m256d _bj_im2 = _mm256_load_pd(pBim + 8);
-                    __m256d _bj_re3 = _mm256_load_pd(pBre + 12);
-                    __m256d _bj_im3 = _mm256_load_pd(pBim + 12);
+                    __m256d _bj_re2 = _mm256_loadu_pd(pBre + 8);
+                    __m256d _bj_im2 = _mm256_loadu_pd(pBim + 8);
+                    __m256d _bj_re3 = _mm256_loadu_pd(pBre + 12);
+                    __m256d _bj_im3 = _mm256_loadu_pd(pBim + 12);
 
                     __m256d _aj_re2 = _mm256_fmsub_pd(_bj_re2, _ap_re, _mm256_mul_pd(_bj_im2, _ap_im));
                     __m256d _aj_im2 = _mm256_fmadd_pd(_bj_re2, _ap_im, _mm256_mul_pd(_bj_im2, _ap_re));
@@ -191,8 +189,8 @@ void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_opts opt
                 for (int n = 0; n < q; ++n) {
                     __m256d _fn = _mm256_set1_pd(f[n]);
 
-                    __m256d _an_re = _mm256_load_pd(pNre);
-                    __m256d _an_im = _mm256_load_pd(pNim);
+                    __m256d _an_re = _mm256_loadu_pd(pNre);
+                    __m256d _an_im = _mm256_loadu_pd(pNim);
 
                     {
                         __m256d _aj_re0 = _mm256_load_pd(pAre + 0);
@@ -261,6 +259,7 @@ void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_opts opt
         });
 }
 
+/*
 template<>
 void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
 {
@@ -324,10 +323,10 @@ void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
                 __m256 _ap_im = _mm256_set1_ps(ap.imag());
 
                 {
-                    __m256 _bj_re0 = _mm256_load_ps(pBre + 0);
-                    __m256 _bj_im0 = _mm256_load_ps(pBim + 0);
-                    __m256 _bj_re1 = _mm256_load_ps(pBre + 8);
-                    __m256 _bj_im1 = _mm256_load_ps(pBim + 8);
+                    __m256 _bj_re0 = _mm256_loadu_ps(pBre + 0);
+                    __m256 _bj_im0 = _mm256_loadu_ps(pBim + 0);
+                    __m256 _bj_re1 = _mm256_loadu_ps(pBre + 8);
+                    __m256 _bj_im1 = _mm256_loadu_ps(pBim + 8);
 
                     __m256 _aj_re0 = _mm256_fmsub_ps(_bj_re0, _ap_re, _mm256_mul_ps(_bj_im0, _ap_im));
                     __m256 _aj_im0 = _mm256_fmadd_ps(_bj_re0, _ap_im, _mm256_mul_ps(_bj_im0, _ap_re));
@@ -340,10 +339,10 @@ void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
                     _mm256_store_ps(pAim + 8, _aj_im1);
                 }
                 {
-                    __m256 _bj_re2 = _mm256_load_ps(pBre + 16);
-                    __m256 _bj_im2 = _mm256_load_ps(pBim + 16);
-                    __m256 _bj_re3 = _mm256_load_ps(pBre + 24);
-                    __m256 _bj_im3 = _mm256_load_ps(pBim + 24);
+                    __m256 _bj_re2 = _mm256_loadu_ps(pBre + 16);
+                    __m256 _bj_im2 = _mm256_loadu_ps(pBim + 16);
+                    __m256 _bj_re3 = _mm256_loadu_ps(pBre + 24);
+                    __m256 _bj_im3 = _mm256_loadu_ps(pBim + 24);
 
                     __m256 _aj_re2 = _mm256_fmsub_ps(_bj_re2, _ap_re, _mm256_mul_ps(_bj_im2, _ap_im));
                     __m256 _aj_im2 = _mm256_fmadd_ps(_bj_re2, _ap_im, _mm256_mul_ps(_bj_im2, _ap_re));
@@ -377,8 +376,8 @@ void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
                 for (int n = 0; n < q; ++n) {
                     __m256 _fn = _mm256_set1_ps(f[n]);
 
-                    __m256 _an_re = _mm256_load_ps(pNre);
-                    __m256 _an_im = _mm256_load_ps(pNim);
+                    __m256 _an_re = _mm256_loadu_ps(pNre);
+                    __m256 _an_im = _mm256_loadu_ps(pNim);
 
                     {
                         __m256 _aj_re0 = _mm256_load_ps(pAre + 0);
@@ -447,5 +446,6 @@ void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opts opts)
         });
 
 }
+*/
 #endif
 #endif
