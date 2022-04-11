@@ -242,9 +242,74 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 	__m256i _spreadlo = _mm256_set_epi32(3, 3, 2, 2, 1, 1, 0, 0);
 	__m256i _spreadhi = _mm256_set_epi32(7, 7, 6, 6, 5, 5, 4, 4);
 
-	BIGINT end2 = begin + (end - begin) & ~0x01;
+	BIGINT end2 = begin + ((end - begin) & ~0x01);
 
 	switch (nsPadded) {
+	case 4:
+		// Unrolled loop
+		for (BIGINT i = begin; i < end2; i += 2)
+		{
+			float* pDu0 = du_padded + 2 * i1[i + 0];
+			float* pDu1 = du_padded + 2 * i1[i + 1];
+
+			__m256 _k0 = _mm256_castps128_ps256(_mm_load_ps(pKer + 0));
+
+			__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
+			__m256 _du0 = _mm256_load_ps(pDu0 + 0);
+			__m256 _out0 = _mm256_mul_ps(_kk0, _du0);
+
+			__m256 _k1 = _mm256_castps128_ps256(_mm_load_ps(pKer + 4));
+
+			__m256 _kk1 = _mm256_permutevar8x32_ps(_k1, _spreadlo);
+			__m256 _du1 = _mm256_loadu_ps(pDu1 + 0);
+			__m256 _out1 = _mm256_mul_ps(_kk1, _du1);
+
+			_out0 = _mm256_add_ps(_out0,
+				_mm256_permute2f128_ps(_out0, _out0, 0x01));
+
+			_out1 = _mm256_add_ps(_out1,
+				_mm256_permute2f128_ps(_out1, _out1, 0x01));
+
+			_out0 = _mm256_add_ps(_out0,
+				_mm256_permute_ps(_out0, 0x8e));
+
+			_out1 = _mm256_add_ps(_out1,
+				_mm256_permute_ps(_out1, 0x8e));
+
+			// Copy result buffer to output array
+			BIGINT si0 = sort_indices[i + 0];
+			BIGINT si1 = sort_indices[i + 1];
+
+			_mm256_maskstore_ps(data_nonuniform + 2 * si0, _mask, _out0);
+			_mm256_maskstore_ps(data_nonuniform + 2 * si1, _mask, _out1);
+
+			pKer += 8;
+		}
+		// Short tail
+		for (BIGINT i = end2; i < end; i++)
+		{
+			float* pDu = du_padded + 2 * i1[i];
+
+			__m256 _k0 = _mm256_castps128_ps256(_mm_load_ps(pKer + 0));
+
+			__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
+			__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+			__m256 _out0 = _mm256_mul_ps(_kk0, _du0);
+
+			_out0 = _mm256_add_ps(_out0,
+				_mm256_permute2f128_ps(_out0, _out0, 0x01));
+
+			_out0 = _mm256_add_ps(_out0,
+				_mm256_permute_ps(_out0, 0x8e));
+
+			// Copy result buffer to output array
+			BIGINT si0 = sort_indices[i];
+
+			_mm256_maskstore_ps(data_nonuniform + 2 * si0, _mask, _out0);
+
+			pKer += nsPadded;
+		}
+		break;
 	case 8:
 		// Unrolled loop
 		for (BIGINT i = begin; i < end2; i += 2)
@@ -395,6 +460,7 @@ void interp_square(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 	}
 }
 
+#ifdef __AVX2__
 #ifdef __AVX512F__
 template<>
 inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform, double* du_padded,
@@ -770,7 +836,6 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 	}
 }
 #else
-#ifdef __AVX2__
 template<>
 inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform, double* du_padded,
 	double* kernel_vals1, double* kernel_vals2,
@@ -945,6 +1010,38 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 	__m256i _spreadhi = _mm256_set_epi32(7, 7, 6, 6, 5, 5, 4, 4);
 
 	switch (nsPadded) {
+	case 4:
+		for (BIGINT i = begin; i < end; i++)
+		{
+			__m256 _out0 = _mm256_setzero_ps();
+
+			for (int dy = 0; dy < ns; dy++) {
+				float* pDu0 = du_padded + 2 * (paddedN1 * (i2[i] + dy) + i1[i]);
+
+				__m256 _ker2 = _mm256_set1_ps(pKer2[dy]);
+				__m256 _ker1 = _mm256_castps128_ps256(_mm_load_ps(pKer1 + 0));
+				__m256 _k0 = _mm256_mul_ps(_ker2, _ker1);
+
+				__m256 _kk0 = _mm256_permutevar8x32_ps(_k0, _spreadlo);
+				__m256 _du0 = _mm256_loadu_ps(pDu0 + 0);
+				_out0 = _mm256_fmadd_ps(_kk0, _du0, _out0);
+			}
+
+			_out0 = _mm256_add_ps(_out0,
+				_mm256_permute2f128_ps(_out0, _out0, 0x01));
+
+			_out0 = _mm256_add_ps(_out0,
+				_mm256_permute_ps(_out0, 0x8e));
+
+			// Copy result buffer to output array
+			BIGINT si0 = sort_indices[i + 0];
+
+			_mm256_maskstore_ps(data_nonuniform + 2 * si0, _mask, _out0);
+
+			pKer1 += 4;
+			pKer2 += 4;
+		}
+		break;
 	case 8:
 		for (BIGINT i = begin; i < end; i++)
 		{

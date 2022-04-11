@@ -666,6 +666,102 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 		ker += 8;
 	}
 }
+#else
+inline __m256 _mm_broadcastps128_ps256(__m128 a) {
+	return _mm256_castsi256_ps(_mm256_broadcastsi128_si256(_mm_castps_si128(a)));
+}
+
+template<>
+inline void eval_kernel_bulk_generic<4, 7>(float* c, float* kernel_vals, float* x1, const BIGINT size)
+{
+	__m256 _two = _mm256_set1_ps(2.0f);
+	__m256 _ns_m_1 = _mm256_set1_ps(3.0f);
+
+	BIGINT size8 = size - size % 8;
+
+	float* ker = kernel_vals;
+
+	__m256 _c0 = _mm_broadcastps128_ps256(_mm_load_ps(c + 0));
+	__m256 _c1 = _mm_broadcastps128_ps256(_mm_load_ps(c + 4));
+	__m256 _c2 = _mm_broadcastps128_ps256(_mm_load_ps(c + 8));
+	__m256 _c3 = _mm_broadcastps128_ps256(_mm_load_ps(c + 12));
+	__m256 _c4 = _mm_broadcastps128_ps256(_mm_load_ps(c + 16));
+	__m256 _c5 = _mm_broadcastps128_ps256(_mm_load_ps(c + 20));
+	__m256 _c6 = _mm_broadcastps128_ps256(_mm_load_ps(c + 24));
+
+	// main loop
+	for (BIGINT i = 0; i < size8; i += 8)
+	{
+		__m256 _x_ab = _mm256_insertf128_ps(_mm256_set1_ps(x1[i + 0]), _mm_set1_ps(x1[i + 1]), 1);
+		__m256 _x_cd = _mm256_insertf128_ps(_mm256_set1_ps(x1[i + 2]), _mm_set1_ps(x1[i + 3]), 1);
+		__m256 _x_ef = _mm256_insertf128_ps(_mm256_set1_ps(x1[i + 4]), _mm_set1_ps(x1[i + 5]), 1);
+		__m256 _x_gh = _mm256_insertf128_ps(_mm256_set1_ps(x1[i + 6]), _mm_set1_ps(x1[i + 7]), 1);
+
+		// scale so local grid offset z in [-1,1]
+		__m256 _z_ab = _mm256_fmadd_ps(_x_ab, _two, _ns_m_1);
+		__m256 _z_cd = _mm256_fmadd_ps(_x_cd, _two, _ns_m_1);
+		__m256 _z_ef = _mm256_fmadd_ps(_x_ef, _two, _ns_m_1);
+		__m256 _z_gh = _mm256_fmadd_ps(_x_gh, _two, _ns_m_1);
+
+		__m256 _k_ab = _mm256_fmadd_ps(_c6, _z_ab, _c5);
+		__m256 _k_cd = _mm256_fmadd_ps(_c6, _z_cd, _c5);
+		__m256 _k_ef = _mm256_fmadd_ps(_c6, _z_ef, _c5);
+		__m256 _k_gh = _mm256_fmadd_ps(_c6, _z_gh, _c5);
+
+		_k_ab = _mm256_fmadd_ps(_k_ab, _z_ab, _c4);
+		_k_cd = _mm256_fmadd_ps(_k_cd, _z_cd, _c4);
+		_k_ef = _mm256_fmadd_ps(_k_ef, _z_ef, _c4);
+		_k_gh = _mm256_fmadd_ps(_k_gh, _z_gh, _c4);
+
+		_k_ab = _mm256_fmadd_ps(_k_ab, _z_ab, _c3);
+		_k_cd = _mm256_fmadd_ps(_k_cd, _z_cd, _c3);
+		_k_ef = _mm256_fmadd_ps(_k_ef, _z_ef, _c3);
+		_k_gh = _mm256_fmadd_ps(_k_gh, _z_gh, _c3);
+
+		_k_ab = _mm256_fmadd_ps(_k_ab, _z_ab, _c2);
+		_k_cd = _mm256_fmadd_ps(_k_cd, _z_cd, _c2);
+		_k_ef = _mm256_fmadd_ps(_k_ef, _z_ef, _c2);
+		_k_gh = _mm256_fmadd_ps(_k_gh, _z_gh, _c2);
+
+		_k_ab = _mm256_fmadd_ps(_k_ab, _z_ab, _c1);
+		_k_cd = _mm256_fmadd_ps(_k_cd, _z_cd, _c1);
+		_k_ef = _mm256_fmadd_ps(_k_ef, _z_ef, _c1);
+		_k_gh = _mm256_fmadd_ps(_k_gh, _z_gh, _c1);
+
+		_k_ab = _mm256_fmadd_ps(_k_ab, _z_ab, _c0);
+		_k_cd = _mm256_fmadd_ps(_k_cd, _z_cd, _c0);
+		_k_ef = _mm256_fmadd_ps(_k_ef, _z_ef, _c0);
+		_k_gh = _mm256_fmadd_ps(_k_gh, _z_gh, _c0);
+
+		_mm256_store_ps(ker + 0, _k_ab);
+		_mm256_store_ps(ker + 8, _k_cd);
+		_mm256_store_ps(ker + 16, _k_ef);
+		_mm256_store_ps(ker + 24, _k_gh);
+
+		ker += 32;
+	}
+
+	// short tail
+	for (BIGINT i = size8; i < size; i++)
+	{
+		__m256 _x_a = _mm256_set1_ps(x1[i]);
+		// scale so local grid offset z in [-1,1]
+		__m256 _z_a = _mm256_fmadd_ps(_x_a, _two, _ns_m_1);
+
+		__m256 _k_a = _mm256_fmadd_ps(_c6, _z_a, _c5);
+
+		_k_a = _mm256_fmadd_ps(_k_a, _z_a, _c4);
+		_k_a = _mm256_fmadd_ps(_k_a, _z_a, _c3);
+		_k_a = _mm256_fmadd_ps(_k_a, _z_a, _c2);
+		_k_a = _mm256_fmadd_ps(_k_a, _z_a, _c1);
+		_k_a = _mm256_fmadd_ps(_k_a, _z_a, _c0);
+
+		_mm_store_ps(ker, _mm256_castps256_ps128(_k_a));
+
+		ker += 4;
+	}
+}
+
 #endif
 #else
 template<int ns, int np>

@@ -428,6 +428,7 @@ void spread_subproblem_2d(BIGINT* sort_indices,
 	}
 }
 
+#ifdef __AVX2__
 #ifdef __AVX512F__
 template<>
 inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
@@ -732,7 +733,6 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 	scalable_aligned_free(du1); scalable_aligned_free(du2); scalable_aligned_free(du3);
 }
 #else
-#ifdef __AVX2__
 template<>
 inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 	BIGINT off1, BIGINT off2,
@@ -900,6 +900,35 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 	__m256i _spreadhi = _mm256_set_epi32(7, 7, 6, 6, 5, 5, 4, 4);
 
 	switch (nsPadded) {
+	case 4:
+		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+			// Combine kernel with complex source value
+			BIGINT si = sort_indices[i];
+			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
+			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
+
+			__m256 _k0 = _mm256_castps128_ps256(_mm_load_ps(pKer1 + 0));
+
+			__m256 _kk0 = _mm256_mul_ps(_dd0, _mm256_permutevar8x32_ps(_k0, _spreadlo));
+
+			// critical inner loop:
+			for (int dy = 0; dy < ns; ++dy) {
+				BIGINT j = size1 * (i2[i] - off2 + dy) + i1[i] - off1;   // should be in subgrid
+				float* pDu = du + 2 * j;
+
+				__m256 _kerval = _mm256_set1_ps(pKer2[dy]);
+
+				__m256 _du0 = _mm256_loadu_ps(pDu + 0);
+
+				_du0 = _mm256_fmadd_ps(_kerval, _kk0, _du0);
+
+				_mm256_storeu_ps(pDu + 0, _du0);
+			}
+
+			pKer1 += nsPadded;
+			pKer2 += nsPadded;
+		}
+		break;
 	case 8:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			// Combine kernel with complex source value

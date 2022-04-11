@@ -26,19 +26,15 @@ PYTHON = python3
 # Notes: 1) -Ofast breaks isfinite() & isnan(), so use -O3 which now is as fast
 #        2) -fcx-limited-range for fortran-speed complex arith in C++
 #        3) we use simply-expanded (:=) makefile variables, otherwise confusing
-CFLAGS := -O3 -funroll-loops -march=native -fcx-limited-range
+CFLAGS := -DMKL_ILP64 -O3 -funroll-loops -march=native -fcx-limited-range
 FFLAGS := $(CFLAGS)
 CXXFLAGS := $(CFLAGS)
-# put this in your make.inc if you have FFTW>=3.3.5 and want thread-safe use...
-#CXXFLAGS += -DFFTW_PLAN_SAFE
-# FFTW base name, and math linking...
-FFTWNAME = fftw3
-# linux default is fftw3_omp, since 10% faster than fftw3_threads...
-FFTWOMPSUFFIX = omp
+
+
 LIBS :=  -L${MKLROOT}/lib/intel64 -ltbb -ltbbmalloc -lmkl_core -lmkl_intel_ilp64 -lm
 # multithreading for GCC: C++/C/Fortran, MATLAB, and octave (ICC differs)...
-OMPFLAGS = -fopenmp
-OMPLIBS = -lgomp
+OMPFLAGS = -qopenmp
+OMPLIBS = 
 MOMPFLAGS = -D_OPENMP
 OOMPFLAGS =
 # MATLAB MEX compilation (also see below +=)...
@@ -61,7 +57,7 @@ FINUFFT = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 # Now come flags that should be added, whatever user overrode in make.inc.
 # -fPIC (position-indep code) needed to build dyn lib (.so)
 # Also, we force return (via :=) to the land of simply-expanded variables...
-INCL = -DMKL_ILP64  -I"${MKLROOT}/include" -I"${MKLROOT}/include/fftw" -Iinclude
+INCL = -I"${MKLROOT}/include" -I"${MKLROOT}/include/fftw" -Iinclude
 CXXFLAGS := $(CXXFLAGS) $(INCL) -fPIC -std=c++17
 CFLAGS := $(CFLAGS) $(INCL) -fPIC
 # here /usr/include needed for fftw3.f "fortran header"...
