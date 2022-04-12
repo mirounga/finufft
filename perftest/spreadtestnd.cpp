@@ -234,7 +234,6 @@ int main(int argc, char* argv[])
     // note this is weaker than below dir=2 test, but is good indicator that
     // periodic wrapping is correct
   }
-  return 0;
 
   // test direction 2 (U -> NU interpolation) ..............................
   printf("making more random NU pts...\n");
