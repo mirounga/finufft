@@ -7,6 +7,7 @@
 #include <utils_precindep.h>
 #include <spreadinterp.h>
 #include <fftw_defs.h>
+#include <onedim_fseries_kernel.h>
 
 #include <iostream>
 #include <iomanip>
@@ -684,9 +685,9 @@ int FINUFFT_MAKEPLAN(int type, int dim, BIGINT* n_modes, int iflag,
 
     // STEP 0: get Fourier coeffs of spreading kernel along each fine grid dim
     CNTime timer; timer.start();
-    onedim_fseries_kernel(p->nf1, p->phiHat1, p->spopts);
-    if (dim>1) onedim_fseries_kernel(p->nf2, p->phiHat2, p->spopts);
-    if (dim>2) onedim_fseries_kernel(p->nf3, p->phiHat3, p->spopts);
+    onedim_fseries_kernel<FLT>(p->nf1, p->phiHat1, p->spopts);
+    if (dim>1) onedim_fseries_kernel<FLT>(p->nf2, p->phiHat2, p->spopts);
+    if (dim>2) onedim_fseries_kernel<FLT>(p->nf3, p->phiHat3, p->spopts);
     if (p->opts.debug) printf("[%s] kernel fser (ns=%d):\t\t%.3g s\n",__func__,p->spopts.nspread, timer.elapsedsec());
 
     timer.restart();

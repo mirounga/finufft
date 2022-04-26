@@ -35,7 +35,7 @@ CXXFLAGS := $(CFLAGS) $(CXXFLAGS)
 FFTWNAME = fftw3
 # linux default is fftw3_omp, since 10% faster than fftw3_threads...
 FFTWOMPSUFFIX = omp
-LIBS := -lm
+LIBS := -L${MKLROOT}/lib/intel64 -ltbb -lm
 # multithreading for GCC: C++/C/Fortran, MATLAB, and octave (ICC differs)...
 OMPFLAGS = -fopenmp
 OMPLIBS = -lgomp
@@ -101,11 +101,11 @@ ABSDYNLIB = $(FINUFFT)$(DYNLIB)
 
 # spreader is subset of the library with self-contained testing, hence own objs:
 # double-prec spreader object files that also need single precision...
-SOBJS = src/spreadinterp.o src/utils.o
+SOBJS = src/spreadinterp.o src/eval_kernel.o src/utils.o
 # their single-prec versions
 SOBJSF = $(SOBJS:%.o=%_32.o)
 # precision-dependent spreader object files (compiled & linked only once)...
-SOBJS_PI = src/utils_precindep.o
+SOBJS_PI = src/utils_precindep.o src/subgrid.o
 # spreader dual-precision objs
 SOBJSD = $(SOBJS) $(SOBJSF) $(SOBJS_PI)
 

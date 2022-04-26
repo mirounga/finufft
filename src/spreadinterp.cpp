@@ -4,10 +4,17 @@
 #include <utils.h>
 #include <utils_precindep.h>
 
+#include <interp.h>
+#include <foldrescale.h>
+#include <spread.h>
+
 #include <stdlib.h>
 #include <vector>
 #include <math.h>
 #include <stdio.h>
+
+#include <tbb/tbb.h>
+
 using namespace std;
 
 // declarations of purely internal functions...
@@ -40,11 +47,6 @@ void bin_sort_multithread(BIGINT *ret, BIGINT M, FLT *kx, FLT *ky, FLT *kz,
 	      BIGINT N1,BIGINT N2,BIGINT N3,int pirange,
               double bin_size_x,double bin_size_y,double bin_size_z, int debug,
               int nthr);
-void get_subgrid(BIGINT &offset1,BIGINT &offset2,BIGINT &offset3,BIGINT &size1,
-		 BIGINT &size2,BIGINT &size3,BIGINT M0,FLT* kx0,FLT* ky0,
-		 FLT* kz0,int ns, int ndims);
-
-
 
 /* local NU coord fold+rescale macro: does the following affine transform to x:
      when p=true:   map [-3pi,-pi) and [-pi,pi) and [pi,3pi)    each to [0,N)
@@ -310,119 +312,183 @@ int spreadSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3,
 		      FLT *data_nonuniform, spread_opts opts, int did_sort)
 // Spread NU pts in sorted order to a uniform grid. See spreadinterp() for doc.
 {
-  CNTime timer;
-  int ndims = ndims_from_Ns(N1,N2,N3);
-  BIGINT N=N1*N2*N3;            // output array size
-  int ns=opts.nspread;          // abbrev. for w, kernel width
-  int nthr = MY_OMP_GET_MAX_THREADS();  // # threads to use to spread
-  if (opts.nthreads>0)
-    nthr = min(nthr,opts.nthreads);     // user override up to max avail
-  if (opts.debug)
-    printf("\tspread %dD (M=%lld; N1=%lld,N2=%lld,N3=%lld; pir=%d), nthr=%d\n",ndims,(long long)M,(long long)N1,(long long)N2,(long long)N3,opts.pirange,nthr);
-  
-  timer.start();
-  for (BIGINT i=0; i<2*N; i++) // zero the output array. std::fill is no faster
-    data_uniform[i]=0.0;
-  if (opts.debug) printf("\tzero output array\t%.3g s\n",timer.elapsedsec());
-  if (M==0)                     // no NU pts, we're done
-    return 0;
-  
-  int spread_single = (nthr==1) || (M*100<N);     // low-density heuristic?
-  spread_single = 0;                 // for now
-  timer.start();
-  if (spread_single) {    // ------- Basic single-core t1 spreading ------
-    for (BIGINT j=0; j<M; j++) {
-      // *** todo, not urgent
-      // ... (question is: will the index wrapping per NU pt slow it down?)
-    }
-    if (opts.debug) printf("\tt1 simple spreading:\t%.3g s\n",timer.elapsedsec());
-    
-  } else {           // ------- Fancy multi-core blocked t1 spreading ----
-                     // Splits sorted inds (jfm's advanced2), could double RAM.
-    // choose nb (# subprobs) via used nthreads:
-    int nb = min((BIGINT)nthr,M);         // simply split one subprob per thr...
-    if (nb*(BIGINT)opts.max_subproblem_size<M) {  // ...or more subprobs to cap size
-      nb = 1 + (M-1)/opts.max_subproblem_size;  // int div does ceil(M/opts.max_subproblem_size)
-      if (opts.debug) printf("\tcapping subproblem sizes to max of %d\n",opts.max_subproblem_size);
-    }
-    if (M*1000<N) {         // low-density heuristic: one thread per NU pt!
-      nb = M;
-      if (opts.debug) printf("\tusing low-density speed rescue nb=M...\n");
-    }
-    if (!did_sort && nthr==1) {
-      nb = 1;
-      if (opts.debug) printf("\tunsorted nthr=1: forcing single subproblem...\n");
-    }
-    if (opts.debug && nthr>opts.atomic_threshold)
-      printf("\tnthr big: switching add_wrapped OMP from critical to atomic (!)\n");
-      
-    std::vector<BIGINT> brk(nb+1); // NU index breakpoints defining nb subproblems
-    for (int p=0;p<=nb;++p)
-      brk[p] = (BIGINT)(0.5 + M*p/(double)nb);
-    
-#pragma omp parallel for num_threads(nthr) schedule(dynamic,1)  // each is big
-      for (int isub=0; isub<nb; isub++) {   // Main loop through the subproblems
-        BIGINT M0 = brk[isub+1]-brk[isub];  // # NU pts in this subproblem
-        // copy the location and data vectors for the nonuniform points
-        FLT *kx0=(FLT*)malloc(sizeof(FLT)*M0), *ky0=NULL, *kz0=NULL;
-        if (N2>1)
-          ky0=(FLT*)malloc(sizeof(FLT)*M0);
-        if (N3>1)
-          kz0=(FLT*)malloc(sizeof(FLT)*M0);
-        FLT *dd0=(FLT*)malloc(sizeof(FLT)*M0*2);    // complex strength data
-        for (BIGINT j=0; j<M0; j++) {           // todo: can avoid this copying?
-          BIGINT kk=sort_indices[j+brk[isub]];  // NU pt from subprob index list
-          kx0[j]=FOLDRESCALE(kx[kk],N1,opts.pirange);
-          if (N2>1) ky0[j]=FOLDRESCALE(ky[kk],N2,opts.pirange);
-          if (N3>1) kz0[j]=FOLDRESCALE(kz[kk],N3,opts.pirange);
-          dd0[j*2]=data_nonuniform[kk*2];     // real part
-          dd0[j*2+1]=data_nonuniform[kk*2+1]; // imag part
+    CNTime timer;
+    int ndims = ndims_from_Ns(N1, N2, N3);
+    BIGINT N = N1 * N2 * N3;            // output array size
+    int ns = opts.nspread;          // abbrev. for w, kernel width
+    FLT ns2 = (FLT)ns / 2;          // half spread width
+    int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+    int nthr = MY_OMP_GET_MAX_THREADS();  // # threads to use to spread
+    if (opts.nthreads > 0)
+        nthr = min(nthr, opts.nthreads);     // user override up to max avail
+    if (opts.debug)
+        printf("\tspread %dD (M=%lld; N1=%lld,N2=%lld,N3=%lld; pir=%d), nthr=%d\n", ndims, (long long)M, (long long)N1, (long long)N2, (long long)N3, opts.pirange, nthr);
+
+    timer.start();
+    for (BIGINT i = 0; i < 2 * N; i++) // zero the output array. std::fill is no faster
+        data_uniform[i] = 0.0;
+    if (opts.debug) printf("\tzero output array\t%.3g s\n", timer.elapsedsec());
+    if (M == 0)                     // no NU pts, we're done
+        return 0;
+
+    int spread_single = (nthr == 1) || (M * 100 < N);     // low-density heuristic?
+    spread_single = 0;                 // for now
+    timer.start();
+    if (spread_single) {    // ------- Basic single-core t1 spreading ------
+        for (BIGINT j = 0; j < M; j++) {
+            // *** todo, not urgent
+            // ... (question is: will the index wrapping per NU pt slow it down?)
         }
-        // get the subgrid which will include padding by roughly nspread/2
-        BIGINT offset1,offset2,offset3,size1,size2,size3; // get_subgrid sets
-        get_subgrid(offset1,offset2,offset3,size1,size2,size3,M0,kx0,ky0,kz0,ns,ndims);  // sets offsets and sizes
-        if (opts.debug>1) { // verbose
-          if (ndims==1)
-            printf("\tsubgrid: off %lld\t siz %lld\t #NU %lld\n",(long long)offset1,(long long)size1,(long long)M0);
-          else if (ndims==2)
-            printf("\tsubgrid: off %lld,%lld\t siz %lld,%lld\t #NU %lld\n",(long long)offset1,(long long)offset2,(long long)size1,(long long)size2,(long long)M0);
-          else
-            printf("\tsubgrid: off %lld,%lld,%lld\t siz %lld,%lld,%lld\t #NU %lld\n",(long long)offset1,(long long)offset2,(long long)offset3,(long long)size1,(long long)size2,(long long)size3,(long long)M0);
-	}
-        // allocate output data for this subgrid
-        FLT *du0=(FLT*)malloc(sizeof(FLT)*2*size1*size2*size3); // complex
-        
-        // Spread to subgrid without need for bounds checking or wrapping
-        if (!(opts.flags & TF_OMIT_SPREADING)) {
-          if (ndims==1)
-            spread_subproblem_1d(offset1,size1,du0,M0,kx0,dd0,opts);
-          else if (ndims==2)
-            spread_subproblem_2d(offset1,offset2,size1,size2,du0,M0,kx0,ky0,dd0,opts);
-          else
-            spread_subproblem_3d(offset1,offset2,offset3,size1,size2,size3,du0,M0,kx0,ky0,kz0,dd0,opts);
-	}
-        
-        // do the adding of subgrid to output
-        if (!(opts.flags & TF_OMIT_WRITE_TO_GRID)) {
-          if (nthr > opts.atomic_threshold)   // see above for debug reporting
-            add_wrapped_subgrid_thread_safe(offset1,offset2,offset3,size1,size2,size3,N1,N2,N3,data_uniform,du0);   // R Blackwell's atomic version
-          else {
+        if (opts.debug) printf("\tt1 simple spreading:\t%.3g s\n", timer.elapsedsec());
+
+    }
+    else {           // ------- Fancy multi-core blocked t1 spreading ----
+                    // Splits sorted inds (jfm's advanced2), could double RAM.
+   // choose nb (# subprobs) via used nthreads:
+        BIGINT nb = min((BIGINT)nthr, M);         // simply split one subprob per thr...
+        if (nb * (BIGINT)opts.max_subproblem_size < M) {  // ...or more subprobs to cap size
+            nb = 1 + (M - 1) / opts.max_subproblem_size;  // int div does ceil(M/opts.max_subproblem_size)
+            if (opts.debug) printf("\tcapping subproblem sizes to max of %d\n", opts.max_subproblem_size);
+        }
+        if (M * 1000 < N) {         // low-density heuristic: one thread per NU pt!
+            nb = M;
+            if (opts.debug) printf("\tusing low-density speed rescue nb=M...\n");
+        }
+        if (!did_sort && nthr == 1) {
+            nb = 1;
+            if (opts.debug) printf("\tunsorted nthr=1: forcing single subproblem...\n");
+        }
+        if (opts.debug && nthr > opts.atomic_threshold)
+            printf("\tnthr big: switching add_wrapped OMP from critical to atomic (!)\n");
+
+        BIGINT* i1 = NULL, * i2 = NULL, * i3 = NULL;
+        FLT* x1 = NULL, * x2 = NULL, * x3 = NULL;
+        FLT* kernel_vals1 = NULL, * kernel_vals2 = NULL, * kernel_vals3 = NULL;
+
+        switch (ndims) {
+        case 3:
+            i3 = (BIGINT*)malloc(sizeof(BIGINT) * M);
+            x3 = (FLT*)malloc(sizeof(FLT) * M);
+            kernel_vals3 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+            // Fall through
+        case 2:
+            i2 = (BIGINT*)malloc(sizeof(BIGINT) * M);
+            x2 = (FLT*)malloc(sizeof(FLT) * M);
+            kernel_vals2 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+            // Fall through
+        case 1:
+            i1 = (BIGINT*)malloc(sizeof(BIGINT) * M);
+            x1 = (FLT*)malloc(sizeof(FLT) * M);
+            kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+        }
+
+        tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
+            [&](const tbb::blocked_range<BIGINT>& r) {
+                // get the subgrid which will include padding by roughly nspread/2
+                BIGINT offset1 = 0, offset2 = 0, offset3 = 0;
+                BIGINT size1 = 1, size2 = 1, size3 = 1; // get_subgrid set
+
+                switch (ndims) {
+                case 3:
+                    foldrescale<FLT>(sort_indices, kz, i3, x3, N3, r.begin(), r.end(), opts);
+                    evaluate_kernel(kernel_vals3, x3, r.begin(), r.end(), opts);
+                    get_subgrid(offset3, size3, i3 + r.begin(), r.size(), ns);
+                    // Fall through
+                case 2:
+                    foldrescale<FLT>(sort_indices, ky, i2, x2, N2, r.begin(), r.end(), opts);
+                    evaluate_kernel(kernel_vals2, x2, r.begin(), r.end(), opts);
+                    get_subgrid(offset2, size2, i2 + r.begin(), r.size(), ns);
+                    // Fall through
+                case 1:
+                    foldrescale<FLT>(sort_indices, kx, i1, x1, N1, r.begin(), r.end(), opts);
+
+                    if (ndims == 1) {
+                        // x1 in [-w/2,-w/2+1], up to rounding
+                        // However if N1*epsmach>O(1) then can cause O(1) errors in x1, hence ppoly
+                        // kernel evaluation will fall outside their designed domains, >>1 errors.
+                        // This can only happen if the overall error would be O(1) anyway. Clip x1??
+                        for (BIGINT i = r.begin(); i < r.end(); i++) {           // loop over NU pts
+                            if (x1[i] < -ns2) x1[i] = -ns2;
+                            if (x1[i] > -ns2 + 1) x1[i] = -ns2 + 1;   // ***
+                        }
+                    }
+
+                    evaluate_kernel(kernel_vals1, x1, r.begin(), r.end(), opts);
+                    get_subgrid(offset1, size1, i1 + r.begin(), r.size(), ns);
+                    break;
+                }
+
+                if (opts.debug > 1) { // verbose
+                    if (ndims == 1)
+                        printf("\tsubgrid: off %lld\t siz %lld\t #NU %lld\n", (long long)offset1, (long long)size1, (long long)r.size());
+                    else if (ndims == 2)
+                        printf("\tsubgrid: off %lld,%lld\t siz %lld,%lld\t #NU %lld\n", (long long)offset1, (long long)offset2, (long long)size1, (long long)size2, (long long)r.size());
+                    else
+                        printf("\tsubgrid: off %lld,%lld,%lld\t siz %lld,%lld,%lld\t #NU %lld\n", (long long)offset1, (long long)offset2, (long long)offset3, (long long)size1, (long long)size2, (long long)size3, (long long)r.size());
+                }
+                // allocate output data for this subgrid
+                // extra MAX_NSPREAD is for the vector spillover
+                // 2x factor for complex
+                FLT* du0 = (FLT*)malloc(sizeof(FLT) * 2 * (size1 * size2 * size3 + MAX_NSPREAD));
+
+                // Spread to subgrid without need for bounds checking or wrapping
+                if (!(opts.flags & TF_OMIT_SPREADING)) {
+                    switch (ndims) {
+                    case 1:
+                        spread_subproblem_1d<FLT>(sort_indices, offset1, size1, du0, data_nonuniform,
+                            i1, kernel_vals1,
+                            r.begin(), r.end(), opts);
+                        break;
+                    case 2:
+                        spread_subproblem_2d<FLT>(sort_indices, offset1, offset2, size1, size2,
+                            du0, data_nonuniform,
+                            i1, i2, kernel_vals1, kernel_vals2,
+                            r.begin(), r.end(), opts);
+                        break;
+                    case 3:
+                        spread_subproblem_3d<FLT>(sort_indices, offset1, offset2, offset3, size1, size2, size3,
+                            du0, data_nonuniform,
+                            i1, i2, i3, kernel_vals1, kernel_vals2, kernel_vals3,
+                            r.begin(), r.end(), opts);
+                        break;
+                    }
+                }
+
+                // do the adding of subgrid to output
+                if (!(opts.flags & TF_OMIT_WRITE_TO_GRID)) {
+                    if (nthr > opts.atomic_threshold)   // see above for debug reporting
+                        add_wrapped_subgrid_thread_safe(offset1, offset2, offset3, size1, size2, size3, N1, N2, N3, data_uniform, du0);   // R Blackwell's atomic version
+                    else {
 #pragma omp critical
             add_wrapped_subgrid(offset1,offset2,offset3,size1,size2,size3,N1,N2,N3,data_uniform,du0);
           }
         }
 
-        // free up stuff from this subprob... (that was malloc'ed by hand)
-        free(dd0);
-        free(du0);
-        free(kx0);
-        if (N2>1) free(ky0);
-        if (N3>1) free(kz0); 
-      }     // end main loop over subprobs
-      if (opts.debug) printf("\tt1 fancy spread: \t%.3g s (%d subprobs)\n",timer.elapsedsec(), nb);
+                // free up stuff from this subprob... (that was malloc'ed by hand)
+                free(du0);
+            }); // end main loop over subprobs
+
+        switch (ndims) {
+        case 3:
+            _mm_free(kernel_vals3);
+            free(x3);
+            free(i3);
+            // Fall through
+        case 2:
+            _mm_free(kernel_vals2);
+            free(x2);
+            free(i2);
+            // Fall through
+        case 1:
+            _mm_free(kernel_vals1);
+            free(x1);
+            free(i1);
+        }
+
+        if (opts.debug) printf("\tt1 fancy spread: \t%.3g s (%lld subprobs)\n", timer.elapsedsec(), (long long)nb);
     }   // end of choice of which t1 spread type to use
     return 0;
-};
+}
 
 
 // --------------------------------------------------------------------------
@@ -626,21 +692,6 @@ int setup_spreader(spread_opts &opts, FLT eps, double upsampfac,
     printf("%s (kerevalmeth=%d) eps=%.3g sigma=%.3g: chose ns=%d beta=%.3g\n",__func__,kerevalmeth,(double)eps,upsampfac,ns,opts.ES_beta);
   
   return ier;
-}
-
-FLT evaluate_kernel(FLT x, const spread_opts &opts)
-/* ES ("exp sqrt") kernel evaluation at single real argument:
-      phi(x) = exp(beta.sqrt(1 - (2x/n_s)^2)),    for |x| < nspread/2
-   related to an asymptotic approximation to the Kaiser--Bessel, itself an
-   approximation to prolate spheroidal wavefunction (PSWF) of order 0.
-   This is the "reference implementation", used by eg finufft/onedim_* 2/17/17
-*/
-{
-  if (abs(x)>=(FLT)opts.ES_halfwidth)
-    // if spreading/FT careful, shouldn't need this if, but causes no speed hit
-    return 0.0;
-  else
-    return exp((FLT)opts.ES_beta * sqrt((FLT)1.0 - (FLT)opts.ES_c*x*x));
 }
 
 static inline void set_kernel_args(FLT *args, FLT x, const spread_opts& opts)
