@@ -30,3 +30,7 @@ test/testutils
 __pycache__*
 
 docs/_build
+.vs
+**/x64
+**/My Advisor Results*
+**/VTune Profiler Results*
