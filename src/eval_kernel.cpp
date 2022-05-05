@@ -632,14 +632,14 @@ inline void eval_kernel_bulk_generic<7, 10>(const float* c, float* kernel_vals, 
 		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c0);
 		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c0);
 
-		_mm512_store_ps(ker + 0, _k_ab);
-		_mm512_store_ps(ker + 16, _k_cd);
-		_mm512_store_ps(ker + 32, _k_ef);
-		_mm512_store_ps(ker + 48, _k_gh);
-		_mm512_store_ps(ker + 64, _k_ij);
-		_mm512_store_ps(ker + 80, _k_kl);
-		_mm512_store_ps(ker + 96, _k_mn);
-		_mm512_store_ps(ker + 112, _k_op);
+		_mm512_storeu_ps(ker + 0, _k_ab);
+		_mm512_storeu_ps(ker + 16, _k_cd);
+		_mm512_storeu_ps(ker + 32, _k_ef);
+		_mm512_storeu_ps(ker + 48, _k_gh);
+		_mm512_storeu_ps(ker + 64, _k_ij);
+		_mm512_storeu_ps(ker + 80, _k_kl);
+		_mm512_storeu_ps(ker + 96, _k_mn);
+		_mm512_storeu_ps(ker + 112, _k_op);
 
 		ker += 128;
 	}

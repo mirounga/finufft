@@ -18,6 +18,8 @@
 extern "C" {
   #include "../contrib/legendre_rule_fast.h"
 }
+
+#include <tbb/tbb.h>
 using namespace std;
 
 
@@ -165,66 +167,6 @@ void set_nhg_type3(FLT S, FLT X, nufft_opts opts, spread_opts spopts,
   *gam = (FLT)*nf / (2.0*opts.upsampfac*Ssafe);  // x scale fac to x'
 }
 
-void onedim_fseries_kernel(BIGINT nf, FLT *fwkerhalf, spread_opts opts)
-/*
-  Approximates exact Fourier series coeffs of cnufftspread's real symmetric
-  kernel, directly via q-node quadrature on Euler-Fourier formula, exploiting
-  narrowness of kernel. Uses phase winding for cheap eval on the regular freq
-  grid. Note that this is also the Fourier transform of the non-periodized
-  kernel. The FT definition is f(k) = int e^{-ikx} f(x) dx. The output has an
-  overall prefactor of 1/h, which is needed anyway for the correction, and
-  arises because the quadrature weights are scaled for grid units not x units.
-
-  Inputs:
-  nf - size of 1d uniform spread grid, must be even.
-  opts - spreading opts object, needed to eval kernel (must be already set up)
-
-  Outputs:
-  fwkerhalf - real Fourier series coeffs from indices 0 to nf/2 inclusive,
-              divided by h = 2pi/n.
-              (should be allocated for at least nf/2+1 FLTs)
-
-  Compare onedim_dct_kernel which has same interface, but computes DFT of
-  sampled kernel, not quite the same object.
-
-  Barnett 2/7/17. openmp (since slow vs fftw in 1D large-N case) 3/3/18.
-  Fixed num_threads 7/20/20
- */
-{
-  FLT J2 = opts.nspread/2.0;            // J/2, half-width of ker z-support
-  // # quadr nodes in z (from 0 to J/2; reflections will be added)...
-  int q=(int)(2 + 3.0*J2);  // not sure why so large? cannot exceed MAX_NQUAD
-  FLT f[MAX_NQUAD];
-  double z[2*MAX_NQUAD], w[2*MAX_NQUAD];
-  legendre_compute_glr(2*q,z,w);        // only half the nodes used, eg on (0,1)
-  std::complex<FLT> a[MAX_NQUAD];
-  for (int n=0;n<q;++n) {               // set up nodes z_n and vals f_n
-    z[n] *= J2;                         // rescale nodes
-    f[n] = J2*(FLT)w[n] * evaluate_kernel((FLT)z[n], opts); // vals & quadr wei
-    a[n] = exp(2*PI*IMA*(FLT)(nf/2-z[n])/(FLT)nf);  // phase winding rates
-  }
-  BIGINT nout=nf/2+1;                   // how many values we're writing to
-  int nt = min(nout,(BIGINT)opts.nthreads);         // how many chunks
-  std::vector<BIGINT> brk(nt+1);        // start indices for each thread
-  for (int t=0; t<=nt; ++t)             // split nout mode indices btw threads
-    brk[t] = (BIGINT)(0.5 + nout*t/(double)nt);
-#pragma omp parallel num_threads(nt)
-  {                                     // each thread gets own chunk to do
-    int t = MY_OMP_GET_THREAD_NUM();
-    std::complex<FLT> aj[MAX_NQUAD];    // phase rotator for this thread
-    for (int n=0;n<q;++n)
-      aj[n] = pow(a[n],(FLT)brk[t]);    // init phase factors for chunk
-    for (BIGINT j=brk[t];j<brk[t+1];++j) {          // loop along output array
-      FLT x = 0.0;                      // accumulator for answer at this j
-      for (int n=0;n<q;++n) {
-        x += f[n] * 2*real(aj[n]);      // include the negative freq
-        aj[n] *= a[n];                  // wind the phases
-      }
-      fwkerhalf[j] = x;
-    }
-  }
-}
-
 void onedim_nuft_kernel(BIGINT nk, FLT *k, FLT *phihat, spread_opts opts)
 /*
   Approximates exact 1D Fourier transform of cnufftspread's real symmetric
@@ -257,14 +199,18 @@ void onedim_nuft_kernel(BIGINT nk, FLT *k, FLT *phihat, spread_opts opts)
     f[n] = J2*(FLT)w[n] * evaluate_kernel((FLT)z[n], opts);  // w/ quadr weights
     //printf("f[%d] = %.3g\n",n,f[n]);
   }
-#pragma omp parallel for num_threads(opts.nthreads)
-  for (BIGINT j=0;j<nk;++j) {          // loop along output array
-    FLT x = 0.0;                       // register
-    for (int n=0;n<q;++n)
-      x += f[n] * 2*cos(k[j]*(FLT)z[n]);  // pos & neg freq pair.  use FLT cos!
-    phihat[j] = x;
-  }
-}  
+
+  tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nk, 10000), // loop along output array
+      [&](const tbb::blocked_range<BIGINT>& r) {
+          for (BIGINT j = r.begin(); j < r.end(); ++j) {
+
+              FLT x = 0.0;                    // register
+		    for (int n=0;n<q;++n)
+		      x += f[n] * 2*cos(k[j]*(FLT)z[n]);  // pos & neg freq pair.  use FLT cos!
+              phihat[j] = x;
+          }
+      });
+}
 
 void deconvolveshuffle1d(int dir,FLT prefac,FLT* ker, BIGINT ms,
 			 FLT *fk, BIGINT nf1, FFTW_CPX* fw, int modeord)
@@ -450,19 +396,24 @@ int deconvolveBatch(int batchSize, FINUFFT_PLAN p, CPX* fkBatch)
     CPX *fki = fkBatch + i*p->N;           // start of i'th fk array in fkBatch
     
     // Call routine from common.cpp for the dim; prefactors hardcoded to 1.0...
-    if (p->dim == 1)
-      deconvolveshuffle1d(p->spopts.spread_direction, 1.0, p->phiHat1,
-                          p->ms, (FLT *)fki,
-                          p->nf1, fwi, p->opts.modeord);
-    else if (p->dim == 2)
-      deconvolveshuffle2d(p->spopts.spread_direction,1.0, p->phiHat1,
-                          p->phiHat2, p->ms, p->mt, (FLT *)fki,
-                          p->nf1, p->nf2, fwi, p->opts.modeord);
-    else
-      deconvolveshuffle3d(p->spopts.spread_direction, 1.0, p->phiHat1,
-                          p->phiHat2, p->phiHat3, p->ms, p->mt, p->mu,
-                          (FLT *)fki, p->nf1, p->nf2, p->nf3,
-                          fwi, p->opts.modeord);
+    switch (p->dim) {
+    case 1:
+        deconvolveshuffle1d(p->spopts.spread_direction, 1.0, p->phiHat1,
+            p->ms, (FLT*)fki,
+            p->nf1, fwi, p->opts.modeord);
+        break;
+    case 2:
+        deconvolveshuffle2d(p->spopts.spread_direction, 1.0, p->phiHat1,
+            p->phiHat2, p->ms, p->mt, (FLT*)fki,
+            p->nf1, p->nf2, fwi, p->opts.modeord);
+        break;
+    case 3:
+        deconvolveshuffle3d(p->spopts.spread_direction, 1.0, p->phiHat1,
+            p->phiHat2, p->phiHat3, p->ms, p->mt, p->mu,
+            (FLT*)fki, p->nf1, p->nf2, p->nf3,
+            fwi, p->opts.modeord);
+        break;
+    }
   }
   return 0;
 }
@@ -833,42 +784,48 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
       ig2 = 1.0/p->t3P.gam2;
     if (d>2)
       ig3 = 1.0/p->t3P.gam3;
-#pragma omp parallel for num_threads(p->opts.nthreads) schedule(static)
-    for (BIGINT j=0;j<nj;++j) {
-      p->X[j] = (xj[j] - p->t3P.C1) * ig1;         // rescale x_j
-      if (d>1)        // (ok to do inside loop because of branch predict)
-        p->Y[j] = (yj[j]- p->t3P.C2) * ig2;        // rescale y_j
-      if (d>2)
-        p->Z[j] = (zj[j] - p->t3P.C3) * ig3;       // rescale z_j
-    }
+    tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nj, 10000), // ... loop over src NU locs
+        [&](const tbb::blocked_range<BIGINT>& r) {
+            for (BIGINT j = r.begin(); j < r.end(); ++j) {
+                p->X[j] = (xj[j] - p->t3P.C1) * ig1;         // rescale x_j
+                if (d > 1)        // (ok to do inside loop because of branch predict)
+                    p->Y[j] = (yj[j] - p->t3P.C2) * ig2;        // rescale y_j
+                if (d > 2)
+                    p->Z[j] = (zj[j] - p->t3P.C3) * ig3;       // rescale z_j
+            }
+        });
 
     // set up prephase array...
     CPX imasign = (p->fftSign>=0) ? IMA : -IMA;             // +-i
     p->prephase = (CPX*)malloc(sizeof(CPX)*nj);
     if (p->t3P.D1!=0.0 || p->t3P.D2!=0.0 || p->t3P.D3!=0.0) {
-#pragma omp parallel for num_threads(p->opts.nthreads) schedule(static)
-      for (BIGINT j=0;j<nj;++j) {          // ... loop over src NU locs
-        FLT phase = p->t3P.D1*xj[j];
-        if (d>1)
-          phase += p->t3P.D2*yj[j];
-        if (d>2)
-          phase += p->t3P.D3*zj[j];
-        p->prephase[j] = cos(phase)+imasign*sin(phase);   // Euler e^{+-i.phase}
-      }
+        tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nj, 10000), // ... loop over src NU locs
+            [&](const tbb::blocked_range<BIGINT>& r) {
+                for (BIGINT j = r.begin(); j < r.end(); ++j) {
+                    FLT phase = p->t3P.D1 * xj[j];
+                    if (d > 1)
+                        phase += p->t3P.D2 * yj[j];
+                    if (d > 2)
+                        phase += p->t3P.D3 * zj[j];
+                    p->prephase[j] = cos(phase) + imasign * sin(phase);   // Euler e^{+-i.phase}
+                }
+            });
     } else
       for (BIGINT j=0;j<nj;++j)
         p->prephase[j] = (CPX)1.0;     // *** or keep flag so no mult in exec??
       
     // rescale the target s_k etc to s'_k etc...
-#pragma omp parallel for num_threads(p->opts.nthreads) schedule(static)
-    for (BIGINT k=0;k<nk;++k) {
-      p->Sp[k] = p->t3P.h1*p->t3P.gam1*(s[k]- p->t3P.D1);  // so |s'_k| < pi/R
-      if (d>1)
-        p->Tp[k] = p->t3P.h2*p->t3P.gam2*(t[k]- p->t3P.D2);  // so |t'_k| < pi/R
-      if (d>2)
-        p->Up[k] = p->t3P.h3*p->t3P.gam3*(u[k]- p->t3P.D3);  // so |u'_k| < pi/R
-    }
-    
+    tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nk, 10000),
+        [&](const tbb::blocked_range<BIGINT>& r) {
+            for (BIGINT k = r.begin(); k < r.end(); ++k) {
+                p->Sp[k] = p->t3P.h1 * p->t3P.gam1 * (s[k] - p->t3P.D1);  // so |s'_k| < pi/R
+                if (d > 1)
+                    p->Tp[k] = p->t3P.h2 * p->t3P.gam2 * (t[k] - p->t3P.D2);  // so |t'_k| < pi/R
+                if (d > 2)
+                    p->Up[k] = p->t3P.h3 * p->t3P.gam3 * (u[k] - p->t3P.D3);  // so |u'_k| < pi/R
+            }
+        });
+
     // (old STEP 3a) Compute deconvolution post-factors array (per targ pt)...
     // (exploits that FT separates because kernel is prod of 1D funcs)
     p->deconv = (CPX*)malloc(sizeof(CPX)*nk);
@@ -885,23 +842,26 @@ int FINUFFT_SETPTS(FINUFFT_PLAN p, BIGINT nj, FLT* xj, FLT* yj, FLT* zj,
     }
     int Cfinite = isfinite(p->t3P.C1) && isfinite(p->t3P.C2) && isfinite(p->t3P.C3);    // C can be nan or inf if M=0, no input NU pts
     int Cnonzero = p->t3P.C1!=0.0 || p->t3P.C2!=0.0 || p->t3P.C3!=0.0;  // cen
-#pragma omp parallel for num_threads(p->opts.nthreads) schedule(static)
-    for (BIGINT k=0;k<nk;++k) {         // .... loop over NU targ freqs
-      FLT phiHat = phiHatk1[k];
-      if (d>1)
-        phiHat *= phiHatk2[k];
-      if (d>2)
-        phiHat *= phiHatk3[k];
-      p->deconv[k] = (CPX)(1.0 / phiHat);
-      if (Cfinite && Cnonzero) {
-        FLT phase = (s[k] - p->t3P.D1) * p->t3P.C1;
-        if (d>1)
-          phase += (t[k] - p->t3P.D2) * p->t3P.C2;
-        if (d>2)
-          phase += (u[k] - p->t3P.D3) * p->t3P.C3;
-        p->deconv[k] *= cos(phase)+imasign*sin(phase);   // Euler e^{+-i.phase}
-      }
-    }
+    tbb::parallel_for(tbb::blocked_range<BIGINT>(0, nk, 10000), // .... loop over NU targ freqs
+        [&](const tbb::blocked_range<BIGINT>& r) {
+            for (BIGINT k = r.begin(); k < r.end(); ++k) {
+                FLT phiHat = phiHatk1[k];
+                if (d > 1)
+                    phiHat *= phiHatk2[k];
+                if (d > 2)
+                    phiHat *= phiHatk3[k];
+                p->deconv[k] = (CPX)(1.0 / phiHat);
+                if (Cfinite && Cnonzero) {
+                    FLT phase = (s[k] - p->t3P.D1) * p->t3P.C1;
+                    if (d > 1)
+                        phase += (t[k] - p->t3P.D2) * p->t3P.C2;
+                    if (d > 2)
+                        phase += (u[k] - p->t3P.D3) * p->t3P.C3;
+                    p->deconv[k] *= cos(phase) + imasign * sin(phase);   // Euler e^{+-i.phase}
+                }
+            }
+        });
+
     free(phiHatk1); free(phiHatk2); free(phiHatk3);  // done w/ deconv fill
     if (p->opts.debug) printf("[%s t3] phase & deconv factors:\t%.3g s\n",__func__,timer.elapsedsec());
 

@@ -56,7 +56,7 @@ void spread_subproblem_1d(BIGINT* sort_indices, BIGINT off1, BIGINT size1, T* du
 }
 
 #ifdef __AVX2__
-#ifdef __AVX512F__
+#ifdef __AVX2__ //__AVX512F__
 template<>
 inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGINT size1, double* du, double* dd,
 	BIGINT* i1,
@@ -258,7 +258,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 	case 4:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
-			__m512 _d0 = _mm512_maskz_load_ps(0x03, dd + 2 * si);
+			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
 
 			// offset rel to subgrid, starts the output indices
@@ -280,7 +280,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 	case 8:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
-			__m512 _d0 = _mm512_maskz_load_ps(0x03, dd + 2 * si);
+			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
 
 			// offset rel to subgrid, starts the output indices
@@ -302,13 +302,13 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 	case 12:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
-			__m512 _d0 = _mm512_maskz_load_ps(0x03, dd + 2 * si);
+			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
 
 			// offset rel to subgrid, starts the output indices
 			float* pDu = du + 2 * (i1[i] - off1);
 
-			__m512 _k0 = _mm512_maskz_load_ps(0x0fff, pKer1 + 0);
+			__m512 _k0 = _mm512_maskz_loadu_ps(0x0fff, pKer1 + 0);
 
 			__m512 _kk0 = _mm512_permutexvar_ps(_spreadlo, _k0);
 			__m512 _kk1 = _mm512_permutexvar_ps(_spreadhi, _k0);
@@ -328,7 +328,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 	case 16:
 		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
-			__m512 _d0 = _mm512_maskz_load_ps(0x03, dd + 2 * si);
+			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
 
 			// offset rel to subgrid, starts the output indices
@@ -910,20 +910,20 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 			BIGINT si2 = sort_indices[i + 2];
 			BIGINT si3 = sort_indices[i + 3];
 
-			__m128 _d0 = _mm_maskz_load_ps(0x3, dd + 2 * si0);
-			__m128 _d1 = _mm_maskz_load_ps(0x3, dd + 2 * si1);
-			__m128 _d2 = _mm_maskz_load_ps(0x3, dd + 2 * si2);
-			__m128 _d3 = _mm_maskz_load_ps(0x3, dd + 2 * si3);
+			__m128 _d0 = _mm_maskz_loadu_ps(0x3, dd + 2 * si0);
+			__m128 _d1 = _mm_maskz_loadu_ps(0x3, dd + 2 * si1);
+			__m128 _d2 = _mm_maskz_loadu_ps(0x3, dd + 2 * si2);
+			__m128 _d3 = _mm_maskz_loadu_ps(0x3, dd + 2 * si3);
 
 			__m512 _dd0 = _mm512_broadcast_f32x2(_d0);
 			__m512 _dd1 = _mm512_broadcast_f32x2(_d1);
 			__m512 _dd2 = _mm512_broadcast_f32x2(_d2);
 			__m512 _dd3 = _mm512_broadcast_f32x2(_d3);
 
-			__m512 _k0 = _mm512_maskz_load_ps(0x00ff, pKer1 + 0);
-			__m512 _k1 = _mm512_maskz_load_ps(0x00ff, pKer1 + 8);
-			__m512 _k2 = _mm512_maskz_load_ps(0x00ff, pKer1 + 16);
-			__m512 _k3 = _mm512_maskz_load_ps(0x00ff, pKer1 + 24);
+			__m512 _k0 = _mm512_maskz_loadu_ps(0x00ff, pKer1 + 0);
+			__m512 _k1 = _mm512_maskz_loadu_ps(0x00ff, pKer1 + 8);
+			__m512 _k2 = _mm512_maskz_loadu_ps(0x00ff, pKer1 + 16);
+			__m512 _k3 = _mm512_maskz_loadu_ps(0x00ff, pKer1 + 24);
 
 			__m512 _kk0 = _mm512_mul_ps(_dd0, _mm512_permutexvar_ps(_spread, _k0));
 			__m512 _kk1 = _mm512_mul_ps(_dd1, _mm512_permutexvar_ps(_spread, _k1));
