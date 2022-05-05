@@ -8,7 +8,7 @@ void interp_line(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 	T* kernel_vals1,
 	BIGINT* i1,
 	BIGINT N1,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 	// 1D interpolate complex values from du_padded array to data_nonuniform, using real weights
 	// ker[0] through ker[ns-1]. out must be size 2 (real,imag), and du_padded
 	// of size 2*N1 (alternating real,imag). i1 is the left-most index in [0,N1)
@@ -19,7 +19,7 @@ void interp_line(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	// main loop over NU targs, interp each from U
-	for (BIGINT i = begin; i < end; i++)
+	for (BIGINT i = 0; i < size; i++)
 	{
 		T* ker = kernel_vals1 + (i * nsPadded);
 
@@ -404,16 +404,16 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 	double* kernel_vals1,
 	BIGINT* i1,
 	BIGINT N1,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	// main loop over NU targs, interp each from U
-	double* pKer = kernel_vals1 + begin * nsPadded;
+	double* pKer = kernel_vals1;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			double* pDu = du_padded + 2 * i1[i];
 
@@ -452,7 +452,7 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			double* pDu = du_padded + 2 * i1[i];
 
@@ -500,7 +500,7 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 		}
 		break;
 	case 16:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			double* pDu = du_padded + 2 * i1[i];
 
@@ -557,7 +557,7 @@ inline void interp_line<double>(BIGINT* sort_indices, double* data_nonuniform, d
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m128d _out0 = _mm_setzero_pd();
 
@@ -589,23 +589,23 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 	float* kernel_vals1,
 	BIGINT* i1,
 	BIGINT N1,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	// main loop over NU targs, interp each from U
-	float* pKer = kernel_vals1 + begin * nsPadded;
+	float* pKer = kernel_vals1;
 
 	__m256i _mask = _mm256_set_epi32(0, 0, 0, 0, 0, 0, -1, -1);
 	__m256i _spreadlo = _mm256_set_epi32(3, 3, 2, 2, 1, 1, 0, 0);
 	__m256i _spreadhi = _mm256_set_epi32(7, 7, 6, 6, 5, 5, 4, 4);
 
-	BIGINT end2 = begin + ((end - begin) & ~0x01);
+	BIGINT size2 = size & ~0x01;
 
 	switch (nsPadded) {
 	case 4:
 		// Unrolled loop
-		for (BIGINT i = begin; i < end2; i += 2)
+		for (BIGINT i = 0; i < size2; i += 2)
 		{
 			float* pDu0 = du_padded + 2 * i1[i + 0];
 			float* pDu1 = du_padded + 2 * i1[i + 1];
@@ -644,7 +644,7 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 			pKer += 8;
 		}
 		// Short tail
-		for (BIGINT i = end2; i < end; i++)
+		for (BIGINT i = size2; i < size; i++)
 		{
 			float* pDu = du_padded + 2 * i1[i];
 
@@ -670,7 +670,7 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 		break;
 	case 8:
 		// Unrolled loop
-		for (BIGINT i = begin; i < end2; i += 2)
+		for (BIGINT i = 0; i < size2; i += 2)
 		{
 			float* pDu0 = du_padded + 2 * i1[i + 0];
 			float* pDu1 = du_padded + 2 * i1[i + 1];
@@ -717,7 +717,7 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 			pKer += 16;
 		}
 		// Short tail
-		for (BIGINT i = end2; i < end; i++)
+		for (BIGINT i = size2; i < size; i++)
 		{
 			float* pDu = du_padded + 2 * i1[i];
 
@@ -746,7 +746,7 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
@@ -780,7 +780,7 @@ void interp_square(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 	T* kernel_vals1, T* kernel_vals2,
 	BIGINT* i1, BIGINT* i2,
 	BIGINT N1, BIGINT N2,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 	// 2D interpolate complex values from du_padded (uniform grid data) array to out value,
 	// using ns*ns square of real weights
 	// in ker. out must be size 2 (real,imag), and du_padded
@@ -794,7 +794,7 @@ void interp_square(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 
-	for (BIGINT i = begin; i < end; i++)
+	for (BIGINT i = 0; i < size; i++)
 	{
 		T* ker1 = kernel_vals1 + (i * nsPadded);
 		T* ker2 = kernel_vals2 + (i * nsPadded);
@@ -826,18 +826,18 @@ inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform,
 	double* kernel_vals1, double* kernel_vals2,
 	BIGINT* i1, BIGINT* i2,
 	BIGINT N1, BIGINT N2,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
-	double* pKer2 = kernel_vals2 + begin * nsPadded;
+	double* pKer1 = kernel_vals1;
+	double* pKer2 = kernel_vals2;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -886,7 +886,7 @@ inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform,
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -946,7 +946,7 @@ inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform,
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m128d _out = _mm_setzero_pd();
 
@@ -981,24 +981,24 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 	float* kernel_vals1, float* kernel_vals2,
 	BIGINT* i1, BIGINT* i2,
 	BIGINT N1, BIGINT N2,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
-	float* pKer2 = kernel_vals2 + begin * nsPadded;
+	float* pKer1 = kernel_vals1;
+	float* pKer2 = kernel_vals2;
 
 	__m512i _spreadlo = _mm512_set_epi32(7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0);
 	__m512i _spreadhi = _mm512_set_epi32(15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8);
 
-	BIGINT end4 = end - (end - begin) % 4;
+	BIGINT size4 = size - size % 4;
 
 	switch (nsPadded) {
 	case 8:
 		// Unrolled loop
-		for (BIGINT i = begin; i < end4; i += 4)
+		for (BIGINT i = 0; i < size4; i += 4)
 		{
 			__m512 _k0 = _mm512_loadu_ps(pKer1 + 0);
 			__m512 _k2 = _mm512_loadu_ps(pKer1 + 16);
@@ -1075,7 +1075,7 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 			pKer2 += 32;
 		}
 		// Short tail
-		for (BIGINT i = end4; i < end; i++)
+		for (BIGINT i = size4; i < size; i++)
 		{
 			__m512 _k0 = _mm512_maskz_load_ps(0x00ff, pKer1 + 0);
 
@@ -1111,7 +1111,7 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m512 _k0 = _mm512_maskz_loadu_ps(0x0fff, pKer1 + 0);
 			__m512 _k1 = _mm512_maskz_loadu_ps(0x0fff, pKer1 + 0);
@@ -1164,7 +1164,7 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
@@ -1200,18 +1200,18 @@ inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform,
 	double* kernel_vals1, double* kernel_vals2,
 	BIGINT* i1, BIGINT* i2,
 	BIGINT N1, BIGINT N2,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
-	double* pKer2 = kernel_vals2 + begin * nsPadded;
+	double* pKer1 = kernel_vals1;
+	double* pKer2 = kernel_vals2;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -1260,7 +1260,7 @@ inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform,
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -1320,7 +1320,7 @@ inline void interp_square<double>(BIGINT* sort_indices, double* data_nonuniform,
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m128d _out = _mm_setzero_pd();
 
@@ -1355,14 +1355,14 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 	float* kernel_vals1, float* kernel_vals2,
 	BIGINT* i1, BIGINT* i2,
 	BIGINT N1, BIGINT N2,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
-	float* pKer2 = kernel_vals2 + begin * nsPadded;
+	float* pKer1 = kernel_vals1;
+	float* pKer2 = kernel_vals2;
 
 	__m256i _mask = _mm256_set_epi32(0, 0, 0, 0, 0, 0, -1, -1);
 	__m256i _spreadlo = _mm256_set_epi32(3, 3, 2, 2, 1, 1, 0, 0);
@@ -1370,7 +1370,7 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 
 	switch (nsPadded) {
 	case 4:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
@@ -1403,7 +1403,7 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 		}
 		break;
 	case 8:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 			__m256 _out1 = _mm256_setzero_ps();
@@ -1441,7 +1441,7 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 			__m256 _out1 = _mm256_setzero_ps();
@@ -1487,7 +1487,7 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
@@ -1525,7 +1525,7 @@ void interp_cube(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 	T* kernel_vals1, T* kernel_vals2, T* kernel_vals3,
 	BIGINT* i1, BIGINT* i2, BIGINT* i3,
 	BIGINT N1, BIGINT N2, BIGINT N3,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 	// 3D interpolate complex values from du_padded (uniform grid data) array to data_nonuniform value,
 	// using ns*ns*ns cube of real weights
 	// in ker. out must be size 2 (real,imag), and du_padded
@@ -1540,7 +1540,7 @@ void interp_cube(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 	const BIGINT paddedN2 = N2 + 2 * MAX_NSPREAD;
 
-	for (BIGINT i = begin; i < end; i++)
+	for (BIGINT i = 0; i < size; i++)
 	{
 		T* ker1 = kernel_vals1 + (i * nsPadded);
 		T* ker2 = kernel_vals2 + (i * nsPadded);
@@ -1575,20 +1575,20 @@ inline void interp_cube<double>(BIGINT* sort_indices, double* data_nonuniform, d
 	double* kernel_vals1, double* kernel_vals2, double* kernel_vals3,
 	BIGINT* i1, BIGINT* i2, BIGINT* i3,
 	BIGINT N1, BIGINT N2, BIGINT N3,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 	const BIGINT paddedN2 = N2 + 2 * MAX_NSPREAD;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
-	double* pKer2 = kernel_vals2 + begin * nsPadded;
-	double* pKer3 = kernel_vals3 + begin * nsPadded;
+	double* pKer1 = kernel_vals1;
+	double* pKer2 = kernel_vals2;
+	double* pKer3 = kernel_vals3;
 
 	switch (nsPadded) {
 	case 4:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -1630,7 +1630,7 @@ inline void interp_cube<double>(BIGINT* sort_indices, double* data_nonuniform, d
 		}
 		break;
 	case 8:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -1683,7 +1683,7 @@ inline void interp_cube<double>(BIGINT* sort_indices, double* data_nonuniform, d
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -1751,7 +1751,7 @@ inline void interp_cube<double>(BIGINT* sort_indices, double* data_nonuniform, d
 		}
 		break;
 	case 16:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256d _out0 = _mm256_setzero_pd();
 			__m256d _out1 = _mm256_setzero_pd();
@@ -1835,16 +1835,16 @@ inline void interp_cube<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 	float* kernel_vals1, float* kernel_vals2, float* kernel_vals3,
 	BIGINT* i1, BIGINT* i2, BIGINT* i3,
 	BIGINT N1, BIGINT N2, BIGINT N3,
-	int ns, BIGINT begin, BIGINT end)
+	int ns, BIGINT size)
 {
 	const int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 
 	const BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
 	const BIGINT paddedN2 = N2 + 2 * MAX_NSPREAD;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
-	float* pKer2 = kernel_vals2 + begin * nsPadded;
-	float* pKer3 = kernel_vals3 + begin * nsPadded;
+	float* pKer1 = kernel_vals1;
+	float* pKer2 = kernel_vals2;
+	float* pKer3 = kernel_vals3;
 	
 	__m256i _mask = _mm256_set_epi32(0, 0, 0, 0, 0, 0, -1, -1);
 	__m256i _spreadlo = _mm256_set_epi32(3, 3, 2, 2, 1, 1, 0, 0);
@@ -1852,7 +1852,7 @@ inline void interp_cube<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 
 	switch (nsPadded) {
 	case 4:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
@@ -1887,7 +1887,7 @@ inline void interp_cube<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 		}
 		break;
 	case 8:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
@@ -1926,7 +1926,7 @@ inline void interp_cube<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 
@@ -1971,7 +1971,7 @@ inline void interp_cube<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 		}
 		break;
 	case 16:
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			__m256 _out0 = _mm256_setzero_ps();
 

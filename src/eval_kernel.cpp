@@ -1408,7 +1408,7 @@ static inline void eval_kernel_vec_Horner(FLT* ker, const FLT x, const int w,
 	}
 }
 
-void evaluate_kernel(FLT* kernel_vals, FLT* x, const BIGINT begin, const BIGINT end, spread_opts& opts)
+void evaluate_kernel(FLT* kernel_vals, FLT* x, const BIGINT begin, const BIGINT end, const spread_opts& opts)
 {
 	int ns = opts.nspread; // kernel width
 	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
