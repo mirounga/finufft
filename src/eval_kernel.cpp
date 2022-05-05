@@ -509,7 +509,7 @@ void eval_kernel_bulk_generic(const double* c, double* kernel_vals, double* x1, 
 }
 #ifdef __AVX512F__
 template<>
-inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float* x1, const BIGINT size)
+inline void eval_kernel_bulk_generic<7, 10>(const float* c, float* kernel_vals, float* x1, const BIGINT size)
 {
 	__m512 _two = _mm512_set1_ps(2.0f);
 	__m512 _ns_m_1 = _mm512_set1_ps(6.0f);
@@ -544,7 +544,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 		// scale so local grid offset z in [-1,1]
 		__m512 _z_ab = _mm512_fmadd_ps(_x_ab, _two, _ns_m_1);
 		__m512 _z_cd = _mm512_fmadd_ps(_x_cd, _two, _ns_m_1);
-		__m512 _z_ef = _mm512_fmadd_ps(_x_e), T(_two, _ns_m_1);
+		__m512 _z_ef = _mm512_fmadd_ps(_x_ef, _two, _ns_m_1);
 		__m512 _z_gh = _mm512_fmadd_ps(_x_gh, _two, _ns_m_1);
 		__m512 _z_ij = _mm512_fmadd_ps(_x_ij, _two, _ns_m_1);
 		__m512 _z_kl = _mm512_fmadd_ps(_x_kl, _two, _ns_m_1);
@@ -553,7 +553,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		__m512 _k_ab = _mm512_fmadd_ps(_c9, _z_ab, _c8);
 		__m512 _k_cd = _mm512_fmadd_ps(_c9, _z_cd, _c8);
-		__m512 _k_ef = _mm512_fmadd_ps(_c9, _z_e), T(_c8);
+		__m512 _k_ef = _mm512_fmadd_ps(_c9, _z_ef, _c8);
 		__m512 _k_gh = _mm512_fmadd_ps(_c9, _z_gh, _c8);
 		__m512 _k_ij = _mm512_fmadd_ps(_c9, _z_ij, _c8);
 		__m512 _k_kl = _mm512_fmadd_ps(_c9, _z_kl, _c8);
@@ -562,7 +562,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c7);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c7);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c7);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c7);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c7);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c7);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c7);
@@ -571,7 +571,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c6);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c6);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c6);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c6);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c6);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c6);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c6);
@@ -580,7 +580,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c5);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c5);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c5);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c5);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c5);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c5);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c5);
@@ -589,7 +589,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c4);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c4);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c4);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c4);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c4);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c4);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c4);
@@ -598,7 +598,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c3);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c3);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c3);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c3);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c3);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c3);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c3);
@@ -607,7 +607,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c2);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c2);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c2);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c2);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c2);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c2);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c2);
@@ -616,7 +616,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c1);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c1);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c1);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c1);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c1);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c1);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c1);
@@ -625,7 +625,7 @@ inline void eval_kernel_bulk_generic<7, 10>(float* c, float* kernel_vals, float*
 
 		_k_ab = _mm512_fmadd_ps(_k_ab, _z_ab, _c0);
 		_k_cd = _mm512_fmadd_ps(_k_cd, _z_cd, _c0);
-		_k_ef = _mm512_fmadd_ps(_k_e), T(_z_e), T(_c0);
+		_k_ef = _mm512_fmadd_ps(_k_ef, _z_ef, _c0);
 		_k_gh = _mm512_fmadd_ps(_k_gh, _z_gh, _c0);
 		_k_ij = _mm512_fmadd_ps(_k_ij, _z_ij, _c0);
 		_k_kl = _mm512_fmadd_ps(_k_kl, _z_kl, _c0);
@@ -1408,7 +1408,7 @@ static inline void eval_kernel_vec_Horner(FLT* ker, const FLT x, const int w,
 	}
 }
 
-void evaluate_kernel(FLT* kernel_vals, FLT* x, const BIGINT begin, const BIGINT end, spread_opts& opts)
+void evaluate_kernel(FLT* kernel_vals, FLT* x, const BIGINT begin, const BIGINT end, const spread_opts& opts)
 {
 	int ns = opts.nspread; // kernel width
 	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4

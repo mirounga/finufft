@@ -7,10 +7,10 @@ template<class T>
 void spread_subproblem_1d(BIGINT* sort_indices, BIGINT off1, BIGINT size1, T* du, T* dd,
 	BIGINT* i1, 
 	T* kernel_vals1, 
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 	/* 1D spreader from nonuniform to uniform subproblem grid, without wrapping.
 	   Inputs:
-	   off1 - integer offset of left end of du subgrid from that of overall fine
+	   off1 - integer offset of left size of du subgrid from that of overall fine
 			  periodized output grid {0,1,..N-1}.
 	   size1 - integer length of output subgrid du
 	   M - number of NU pts in subproblem
@@ -35,9 +35,9 @@ void spread_subproblem_1d(BIGINT* sort_indices, BIGINT off1, BIGINT size1, T* du
 		du[i] = 0.0;
 
 
-	T* pKer1 = kernel_vals1 + begin * nsPadded;
+	T* pKer1 = kernel_vals1;
 
-	for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+	for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 		BIGINT si = sort_indices[i];
 		T re0 = dd[2 * si];
 		T im0 = dd[2 * si + 1];
@@ -55,13 +55,13 @@ void spread_subproblem_1d(BIGINT* sort_indices, BIGINT off1, BIGINT size1, T* du
 	}
 }
 
-#ifdef ___AVX2__
+#ifdef __AVX2__
 
 template<>
 inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGINT size1, double* du, double* dd,
 	BIGINT* i1,
 	double* kernel_vals1,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;          // a.k.a. w
 	double ns2 = (double)ns / 2;          // half spread width
@@ -69,11 +69,11 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 	for (BIGINT i = 0; i < 2 * size1; ++i)         // zero output
 		du[i] = 0.0;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
+	double* pKer1 = kernel_vals1;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -109,7 +109,7 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -154,7 +154,7 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 		}
 		break;
 	case 16:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -213,7 +213,7 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m128d _dd0 = _mm_load_pd(dd + 2 * si);
 
@@ -240,7 +240,7 @@ template<>
 inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGINT size1, float* du, float* dd,
 	BIGINT* i1,
 	float* kernel_vals1,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;          // a.k.a. w
 	float ns2 = (float)ns / 2;          // half spread width
@@ -248,7 +248,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 	for (BIGINT i = 0; i < 2 * size1; ++i)         // zero output
 		du[i] = 0.0;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
+	float* pKer1 = kernel_vals1;
 
 	__m256i _mask = _mm256_set_epi32(0, 0, 0, 0, 0, 0, -1, -1);
 	__m256i _broadcast2 = _mm256_set_epi32(1, 0, 1, 0, 1, 0, 1, 0);
@@ -257,7 +257,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 
 	switch (nsPadded) {
 	case 4:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
 			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
@@ -279,7 +279,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 		}
 		break;
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
 			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
@@ -305,7 +305,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
 			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
@@ -336,7 +336,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 		}
 		break;
 	case 16:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
 			__m256 _dd0 = _mm256_permutevar8x32_ps(_d0, _broadcast2);
@@ -384,7 +384,7 @@ void spread_subproblem_2d(BIGINT* sort_indices,
 	T* du, T* dd,
 	BIGINT* i1, BIGINT* i2,
 	T* kernel_vals1, T* kernel_vals2,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 	/* spreader from dd (NU) to du (uniform) in 2D without wrapping.
 	   See above docs/notes for spread_subproblem_2d.
 	   kx,ky (size M) are NU locations in [off+ns/2,off+size-1-ns/2] in both dims.
@@ -398,10 +398,10 @@ void spread_subproblem_2d(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2; ++i)
 		du[i] = 0.0;
 
-	T* pKer1 = kernel_vals1 + begin * nsPadded;
-	T* pKer2 = kernel_vals2 + begin * nsPadded;
+	T* pKer1 = kernel_vals1;
+	T* pKer2 = kernel_vals2;
 
-	for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+	for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 		BIGINT si = sort_indices[i];
 		T re0 = dd[2 * si];
 		T im0 = dd[2 * si + 1];
@@ -427,7 +427,7 @@ void spread_subproblem_2d(BIGINT* sort_indices,
 	}
 }
 
-#ifdef ___AVX2__
+#ifdef __AVX2__
 #ifdef __AVX512F__
 template<>
 inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
@@ -436,7 +436,7 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 	double* du, double* dd,
 	BIGINT* i1, BIGINT* i2,
 	double* kernel_vals1, double* kernel_vals2,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;
 	double ns2 = (double)ns / 2;          // half spread width
@@ -444,12 +444,12 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2; ++i)
 		du[i] = 0.0;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
-	double* pKer2 = kernel_vals2 + begin * nsPadded;
+	double* pKer1 = kernel_vals1 + 0 * nsPadded;
+	double* pKer2 = kernel_vals2 + 0 * nsPadded;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -492,7 +492,7 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -544,7 +544,7 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			double re0 = dd[2 * si];
 			double im0 = dd[2 * si + 1];
@@ -579,7 +579,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 	float* du0, float* dd,
 	BIGINT* i1, BIGINT* i2,
 	float* kernel_vals1, float* kernel_vals2,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;
 	float ns2 = (float)ns / 2;          // half spread width
@@ -592,17 +592,17 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2; ++i)
 		du0[i] = du1[i] = du2[i] = du3[i] = 0.0;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
-	float* pKer2 = kernel_vals2 + begin * nsPadded;
+	float* pKer1 = kernel_vals1 + 0 * nsPadded;
+	float* pKer2 = kernel_vals2 + 0 * nsPadded;
 
 	__m512i _spread = _mm512_set_epi32(7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0);
 
-	BIGINT end4 = end - (end - begin) % 4;
+	BIGINT size4 = size - (size - 0) % 4;
 
 	switch (nsPadded) {
 	case 8:
 		// Unrolled loop
-		for (BIGINT i = begin; i < end4; i += 4) {           // loop over NU pts
+		for (BIGINT i = 0; i < size4; i += 4) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si0 = sort_indices[i + 0];
 			BIGINT si1 = sort_indices[i + 1];
@@ -667,7 +667,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 			pKer2 += 4 * nsPadded;
 		}
 		// Short tail
-		for (BIGINT i = end4; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = size4; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si0 = sort_indices[i];
 			__m128 _d0 = _mm_maskz_load_ps(0x3, dd + 2 * si0);
@@ -702,7 +702,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			float re0 = dd[2 * si];
 			float im0 = dd[2 * si + 1];
@@ -739,7 +739,7 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 	double* du, double* dd,
 	BIGINT* i1, BIGINT* i2,
 	double* kernel_vals1, double* kernel_vals2,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;
 	double ns2 = (double)ns / 2;          // half spread width
@@ -747,12 +747,12 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2; ++i)
 		du[i] = 0.0;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
-	double* pKer2 = kernel_vals2 + begin * nsPadded;
+	double* pKer1 = kernel_vals1;
+	double* pKer2 = kernel_vals2;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -795,7 +795,7 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -847,7 +847,7 @@ inline void spread_subproblem_2d<double>(BIGINT* sort_indices,
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			double re0 = dd[2 * si];
 			double im0 = dd[2 * si + 1];
@@ -882,7 +882,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 	float* du, float* dd,
 	BIGINT* i1, BIGINT* i2,
 	float* kernel_vals1, float* kernel_vals2,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;
 	float ns2 = (float)ns / 2;          // half spread width
@@ -890,8 +890,8 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2; ++i)
 		du[i] = 0.0;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
-	float* pKer2 = kernel_vals2 + begin * nsPadded;
+	float* pKer1 = kernel_vals1 + 0 * nsPadded;
+	float* pKer2 = kernel_vals2 + 0 * nsPadded;
 
 	__m256i _mask = _mm256_set_epi32(0, 0, 0, 0, 0, 0, -1, -1);
 	__m256i _broadcast2 = _mm256_set_epi32(1, 0, 1, 0, 1, 0, 1, 0);
@@ -900,7 +900,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 
 	switch (nsPadded) {
 	case 4:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
@@ -929,7 +929,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 		}
 		break;
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
@@ -962,7 +962,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
@@ -1000,7 +1000,7 @@ inline void spread_subproblem_2d<float>(BIGINT* sort_indices,
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			float re0 = dd[2 * si];
 			float im0 = dd[2 * si + 1];
@@ -1037,7 +1037,7 @@ void spread_subproblem_3d(BIGINT* sort_indices,
 	T* du, T* dd,
 	BIGINT* i1, BIGINT* i2, BIGINT* i3,
 	T* kernel_vals1, T* kernel_vals2, T* kernel_vals3,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 	/* spreader from dd (NU) to du (uniform) in 3D without wrapping.
 	   See above docs/notes for spread_subproblem_2d.
 	   kx,ky,kz (size M) are NU locations in [off+ns/2,off+size-1-ns/2] in each dim.
@@ -1051,11 +1051,11 @@ void spread_subproblem_3d(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2 * size3; ++i)
 		du[i] = 0.0;
 
-	T* pKer1 = kernel_vals1 + begin * nsPadded;
-	T* pKer2 = kernel_vals2 + begin * nsPadded;
-	T* pKer3 = kernel_vals3 + begin * nsPadded;
+	T* pKer1 = kernel_vals1;
+	T* pKer2 = kernel_vals2;
+	T* pKer3 = kernel_vals3;
 
-	for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+	for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 		BIGINT si = sort_indices[i];
 		T re0 = dd[2 * si];
 		T im0 = dd[2 * si + 1];
@@ -1086,7 +1086,7 @@ void spread_subproblem_3d(BIGINT* sort_indices,
 	}
 }
 
-#ifdef ___AVX2__
+#ifdef __AVX2__
 template<>
 inline void spread_subproblem_3d<double>(BIGINT* sort_indices,
 	BIGINT off1, BIGINT off2, BIGINT off3, 
@@ -1094,7 +1094,7 @@ inline void spread_subproblem_3d<double>(BIGINT* sort_indices,
 	double* du, double* dd,
 	BIGINT* i1, BIGINT* i2, BIGINT* i3,
 	double* kernel_vals1, double* kernel_vals2, double* kernel_vals3,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;
 	double ns2 = (double)ns / 2;          // half spread width
@@ -1102,13 +1102,13 @@ inline void spread_subproblem_3d<double>(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2 * size3; ++i)
 		du[i] = 0.0;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
-	double* pKer2 = kernel_vals2 + begin * nsPadded;
-	double* pKer3 = kernel_vals3 + begin * nsPadded;
+	double* pKer1 = kernel_vals1;
+	double* pKer2 = kernel_vals2;
+	double* pKer3 = kernel_vals3;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -1156,7 +1156,7 @@ inline void spread_subproblem_3d<double>(BIGINT* sort_indices,
 		break;
 
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -1213,7 +1213,7 @@ inline void spread_subproblem_3d<double>(BIGINT* sort_indices,
 		break;
 
 	default:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			double re0 = dd[2 * si];
 			double im0 = dd[2 * si + 1];
@@ -1253,7 +1253,7 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 	float* du, float* dd,
 	BIGINT* i1, BIGINT* i2, BIGINT* i3,
 	float* kernel_vals1, float* kernel_vals2, float* kernel_vals3,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;
 	float ns2 = (float)ns / 2;          // half spread width
@@ -1261,9 +1261,9 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 	for (BIGINT i = 0; i < 2 * size1 * size2 * size3; ++i)
 		du[i] = 0.0;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
-	float* pKer2 = kernel_vals2 + begin * nsPadded;
-	float* pKer3 = kernel_vals3 + begin * nsPadded;
+	float* pKer1 = kernel_vals1;
+	float* pKer2 = kernel_vals2;
+	float* pKer3 = kernel_vals3;
 
 	__m256i _mask = _mm256_set_epi32(0, 0, 0, 0, 0, 0, -1, -1);
 	__m256i _broadcast2 = _mm256_set_epi32(1, 0, 1, 0, 1, 0, 1, 0);
@@ -1272,7 +1272,7 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 
 	switch (nsPadded) {
 	case 4:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
@@ -1306,7 +1306,7 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 		break;
 
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
@@ -1344,7 +1344,7 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 		break;
 
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);
@@ -1387,7 +1387,7 @@ inline void spread_subproblem_3d<float>(BIGINT* sort_indices,
 		break;
 
 	case 16:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			// Combine kernel with complex source value
 			BIGINT si = sort_indices[i];
 			__m256 _d0 = _mm256_maskload_ps(dd + 2 * si, _mask);

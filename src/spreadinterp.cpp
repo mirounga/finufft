@@ -275,6 +275,75 @@ int spreadinterpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 	return 0;
 }
 
+void combined_eval_spread_1d(BIGINT* sort_indices,
+	FLT* x1, BIGINT* i1,
+	const BIGINT& offset1, const BIGINT& size1,
+	FLT* du0, FLT* data_nonuniform, BIGINT M, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, 0, M, opts);
+
+	spread_subproblem_1d<FLT>(sort_indices, offset1, size1, du0, data_nonuniform,
+		i1, kernel_vals1,
+		M, opts);
+
+	_mm_free(kernel_vals1);
+}
+
+void combined_eval_spread_2d(BIGINT* sort_indices,
+	FLT* x1, FLT* x2, BIGINT* i1, BIGINT* i2,
+	const BIGINT& offset1, const BIGINT& offset2, const BIGINT& size1, const BIGINT& size2,
+	FLT* du0, FLT* data_nonuniform, BIGINT M, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	FLT* kernel_vals2 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, 0, M, opts);
+	evaluate_kernel(kernel_vals2, x2, 0, M, opts);
+
+	spread_subproblem_2d<FLT>(sort_indices, offset1, offset2, size1, size2,
+		du0, data_nonuniform,
+		i1, i2, kernel_vals1, kernel_vals2,
+		M, opts);
+
+	_mm_free(kernel_vals2);
+	_mm_free(kernel_vals1);
+}
+
+void combined_eval_spread_3d(BIGINT* sort_indices,
+	FLT* x1, FLT* x2, FLT* x3, BIGINT* i1, BIGINT* i2, BIGINT* i3,
+	const BIGINT& offset1, const BIGINT& offset2, const BIGINT& offset3, const BIGINT& size1, const BIGINT& size2, const BIGINT& size3,
+	FLT* du0, FLT* data_nonuniform, BIGINT M, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals2 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals3 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, 0, M, opts);
+	evaluate_kernel(kernel_vals2, x2, 0, M, opts);
+	evaluate_kernel(kernel_vals3, x3, 0, M, opts);
+
+	spread_subproblem_3d<FLT>(sort_indices, offset1, offset2, offset3, size1, size2, size3,
+		du0, data_nonuniform,
+		i1, i2, i3, kernel_vals1, kernel_vals2, kernel_vals3,
+		M, opts);
+
+	_mm_free(kernel_vals3);
+	_mm_free(kernel_vals2);
+	_mm_free(kernel_vals1);
+}
+
 // --------------------------------------------------------------------------
 int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 	FLT* data_uniform, BIGINT M, FLT* kx, FLT* ky, FLT* kz,
@@ -330,58 +399,45 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 		if (opts.debug && nthr > opts.atomic_threshold)
 			printf("\tnthr big: switching add_wrapped OMP from critical to atomic (!)\n");
 
-		BIGINT* i1 = NULL, * i2 = NULL, * i3 = NULL;
-		FLT* x1 = NULL, * x2 = NULL, * x3 = NULL;
-		FLT* kernel_vals1 = NULL, * kernel_vals2 = NULL, * kernel_vals3 = NULL;
-
-		switch (ndims) {
-		case 3:
-			i3 = (BIGINT*)malloc(sizeof(BIGINT) * M);
-			x3 = (FLT*)malloc(sizeof(FLT) * M);
-			kernel_vals3 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
-			// Fall through
-		case 2:
-			i2 = (BIGINT*)malloc(sizeof(BIGINT) * M);
-			x2 = (FLT*)malloc(sizeof(FLT) * M);
-			kernel_vals2 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
-			// Fall through
-		case 1:
-			i1 = (BIGINT*)malloc(sizeof(BIGINT) * M);
-			x1 = (FLT*)malloc(sizeof(FLT) * M);
-			kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
-		}
-
 		tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
 			[&](const tbb::blocked_range<BIGINT>& r) {
+				BIGINT* i1 = NULL, * i2 = NULL, * i3 = NULL;
+				FLT* x1 = NULL, * x2 = NULL, * x3 = NULL;
+
 				// get the subgrid which will include padding by roughly nspread/2
 				BIGINT offset1 = 0, offset2 = 0, offset3 = 0;
 				BIGINT size1 = 1, size2 = 1, size3 = 1; // get_subgrid set
 
 				switch (ndims) {
 				case 3:
-					foldrescale<FLT>(sort_indices, kz, i3, x3, N3, r.begin(), r.end(), opts);
-					get_subgrid(offset3, size3, i3 + r.begin(), r.size(), ns);
+					i3 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					x3 = (FLT*)malloc(sizeof(FLT) * r.size());
+					foldrescale<FLT>(sort_indices + r.begin(), kz, i3, x3, N3, 0, r.size(), opts);
+					get_subgrid(offset3, size3, i3, r.size(), ns);
 					// Fall through
 				case 2:
-					foldrescale<FLT>(sort_indices, ky, i2, x2, N2, r.begin(), r.end(), opts);
-					get_subgrid(offset2, size2, i2 + r.begin(), r.size(), ns);
+					i2 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					x2 = (FLT*)malloc(sizeof(FLT) * r.size());
+					foldrescale<FLT>(sort_indices + r.begin(), ky, i2, x2, N2, 0, r.size(), opts);
+					get_subgrid(offset2, size2, i2, r.size(), ns);
 					// Fall through
 				case 1:
-					foldrescale<FLT>(sort_indices, kx, i1, x1, N1, r.begin(), r.end(), opts);
-					get_subgrid(offset1, size1, i1 + r.begin(), r.size(), ns);
-
-					if (ndims == 1) {
-						// x1 in [-w/2,-w/2+1], up to rounding
-						// However if N1*epsmach>O(1) then can cause O(1) errors in x1, hence ppoly
-						// kernel evaluation will fall outside their designed domains, >>1 errors.
-						// This can only happen if the overall error would be O(1) anyway. Clip x1??
-						for (BIGINT i = r.begin(); i < r.end(); i++) {           // loop over NU pts
-							if (x1[i] < -ns2) x1[i] = -ns2;
-							if (x1[i] > -ns2 + 1) x1[i] = -ns2 + 1;   // ***
-						}
-					}
-
+					i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					x1 = (FLT*)malloc(sizeof(FLT) * r.size());
+					foldrescale<FLT>(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
+					get_subgrid(offset1, size1, i1, r.size(), ns);
 					break;
+				}
+
+				if (ndims == 1) {
+					// x1 in [-w/2,-w/2+1], up to rounding
+					// However if N1*epsmach>O(1) then can cause O(1) errors in x1, hence ppoly
+					// kernel evaluation will fall outside their designed domains, >>1 errors.
+					// This can only happen if the overall error would be O(1) anyway. Clip x1??
+					for (BIGINT i = 0; i < r.size(); i++) {           // loop over NU pts
+						if (x1[i] < -ns2) x1[i] = -ns2;
+						if (x1[i] > -ns2 + 1) x1[i] = -ns2 + 1;   // ***
+					}
 				}
 
 				if (opts.debug > 1) { // verbose
@@ -401,27 +457,25 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 				if (!(opts.flags & TF_OMIT_SPREADING)) {
 					switch (ndims) {
 					case 1:
-						evaluate_kernel(kernel_vals1, x1, r.begin(), r.end(), opts);
-						spread_subproblem_1d<FLT>(sort_indices, offset1, size1, du0, data_nonuniform,
-							i1, kernel_vals1,
-							r.begin(), r.end(), opts);
+						combined_eval_spread_1d(sort_indices + r.begin(),
+							x1, i1,
+							offset1, size1,
+							du0, data_nonuniform,
+							r.size(), opts);
 						break;
 					case 2:
-						evaluate_kernel(kernel_vals1, x1, r.begin(), r.end(), opts);
-						evaluate_kernel(kernel_vals2, x2, r.begin(), r.end(), opts);
-						spread_subproblem_2d<FLT>(sort_indices, offset1, offset2, size1, size2,
+						combined_eval_spread_2d(sort_indices + r.begin(),
+							x1, x2, i1, i2,
+							offset1, offset2, size1, size2,
 							du0, data_nonuniform,
-							i1, i2, kernel_vals1, kernel_vals2,
-							r.begin(), r.end(), opts);
+							r.size(), opts);
 						break;
 					case 3:
-						evaluate_kernel(kernel_vals1, x1, r.begin(), r.end(), opts);
-						evaluate_kernel(kernel_vals2, x2, r.begin(), r.end(), opts);
-						evaluate_kernel(kernel_vals3, x3, r.begin(), r.end(), opts);
-						spread_subproblem_3d<FLT>(sort_indices, offset1, offset2, offset3, size1, size2, size3,
+						combined_eval_spread_3d(sort_indices + r.begin(),
+							x1, x2, x3, i1, i2, i3,
+							offset1, offset2, offset3, size1, size2, size3,
 							du0, data_nonuniform,
-							i1, i2, i3, kernel_vals1, kernel_vals2, kernel_vals3,
-							r.begin(), r.end(), opts);
+							r.size(), opts);
 						break;
 					}
 				}
@@ -438,24 +492,21 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 
 				// free up stuff from this subprob... (that was malloc'ed by hand)
 				free(du0);
-			}); // end main loop over subprobs
 
-		switch (ndims) {
-		case 3:
-			_mm_free(kernel_vals3);
-			free(x3);
-			free(i3);
-			// Fall through
-		case 2:
-			_mm_free(kernel_vals2);
-			free(x2);
-			free(i2);
-			// Fall through
-		case 1:
-			_mm_free(kernel_vals1);
-			free(x1);
-			free(i1);
-		}
+				switch (ndims) {
+				case 3:
+					free(x3);
+					free(i3);
+					// Fall through
+				case 2:
+					free(x2);
+					free(i2);
+					// Fall through
+				case 1:
+					free(x1);
+					free(i1);
+				}
+			}); // end main loop over subprobs
 
 		if (opts.debug) printf("\tt1 fancy spread: \t%.3g s (%lld subprobs)\n", timer.elapsedsec(), (long long)nb);
 	}   // end of choice of which t1 spread type to use
@@ -463,175 +514,228 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 }
 
 static inline void padData_1d(FLT* data, FLT* data_padded, BIGINT N1) {
-    copy(data, data + 2 * N1, data_padded + 2 * MAX_NSPREAD);
-    copy(data, data + 2 * MAX_NSPREAD, data_padded + 2 * (N1 + MAX_NSPREAD));
-    copy(data + 2 * (N1 - MAX_NSPREAD), data + 2 * N1, data_padded);
+	copy(data, data + 2 * N1, data_padded + 2 * MAX_NSPREAD);
+	copy(data, data + 2 * MAX_NSPREAD, data_padded + 2 * (N1 + MAX_NSPREAD));
+	copy(data + 2 * (N1 - MAX_NSPREAD), data + 2 * N1, data_padded);
 }
 
 static inline void padData_2d(FLT* data, FLT* data_padded, BIGINT N1, BIGINT N2) {
-    BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
-    for (BIGINT j = 0; j < N2; j++) {
-        padData_1d(data + 2 * N1 * j, data_padded + 2 * paddedN1 * (j + MAX_NSPREAD), N1);
-    }
-    copy(data_padded + 2 * paddedN1 * N2, data_padded + 2 * paddedN1 * (N2 + MAX_NSPREAD), data_padded);
-    copy(data_padded + 2 * paddedN1 * MAX_NSPREAD, data_padded + 4 * paddedN1 * MAX_NSPREAD, data_padded + 2 * paddedN1 * (N2 + MAX_NSPREAD));
+	BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
+	for (BIGINT j = 0; j < N2; j++) {
+		padData_1d(data + 2 * N1 * j, data_padded + 2 * paddedN1 * (j + MAX_NSPREAD), N1);
+	}
+	copy(data_padded + 2 * paddedN1 * N2, data_padded + 2 * paddedN1 * (N2 + MAX_NSPREAD), data_padded);
+	copy(data_padded + 2 * paddedN1 * MAX_NSPREAD, data_padded + 4 * paddedN1 * MAX_NSPREAD, data_padded + 2 * paddedN1 * (N2 + MAX_NSPREAD));
 }
 
 static inline void padData_3d(FLT* data, FLT* data_padded, BIGINT N1, BIGINT N2, BIGINT N3) {
-    BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
-    BIGINT paddedN2 = N2 + 2 * MAX_NSPREAD;
-    for (BIGINT k = 0; k < N3; k++) {
-        padData_2d(data + 2 * N1 * N2 * k, data_padded + 2 * paddedN1 * paddedN2 * (k + MAX_NSPREAD), N1, N2);
-    }
-    copy(data_padded + 2 * paddedN1 * paddedN2 * N3, data_padded + 2 * paddedN1 * paddedN2 * (N3 + MAX_NSPREAD), data_padded);
-    copy(data_padded + 2 * paddedN1 * paddedN2 * MAX_NSPREAD, data_padded + 4 * paddedN1 * paddedN2 * MAX_NSPREAD, data_padded + 2 * paddedN1 * paddedN2 * (N3 + MAX_NSPREAD));
+	BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
+	BIGINT paddedN2 = N2 + 2 * MAX_NSPREAD;
+	for (BIGINT k = 0; k < N3; k++) {
+		padData_2d(data + 2 * N1 * N2 * k, data_padded + 2 * paddedN1 * paddedN2 * (k + MAX_NSPREAD), N1, N2);
+	}
+	copy(data_padded + 2 * paddedN1 * paddedN2 * N3, data_padded + 2 * paddedN1 * paddedN2 * (N3 + MAX_NSPREAD), data_padded);
+	copy(data_padded + 2 * paddedN1 * paddedN2 * MAX_NSPREAD, data_padded + 4 * paddedN1 * paddedN2 * MAX_NSPREAD, data_padded + 2 * paddedN1 * paddedN2 * (N3 + MAX_NSPREAD));
+}
+
+void combined_eval_interp_1d(BIGINT* sort_indices, FLT* data_nonuniform, FLT* du_padded,
+	FLT* x1,
+	BIGINT* i1,
+	BIGINT N1, BIGINT M,
+	BIGINT begin, BIGINT end, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, 0, M, opts);
+
+
+	interp_line<FLT>(sort_indices, data_nonuniform, du_padded,
+		kernel_vals1,
+		i1,
+		N1,
+		ns, M);
+
+	_mm_free(kernel_vals1);
+}
+
+void combined_eval_interp_2d(BIGINT* sort_indices, FLT* data_nonuniform, FLT* du_padded,
+	FLT* x1, FLT* x2,
+	BIGINT* i1, BIGINT* i2,
+	BIGINT N1, BIGINT N2, BIGINT M,
+	BIGINT begin, BIGINT end, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals2 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, 0, M, opts);
+	evaluate_kernel(kernel_vals2, x2, 0, M, opts);
+
+
+	interp_square<FLT>(sort_indices, data_nonuniform, du_padded,
+		kernel_vals1, kernel_vals2,
+		i1, i2,
+		N1, N2,
+		ns, M);
+
+	_mm_free(kernel_vals2);
+	_mm_free(kernel_vals1);
+}
+
+void combined_eval_interp_3d(BIGINT* sort_indices, FLT* data_nonuniform, FLT* du_padded,
+	FLT* x1, FLT* x2, FLT* x3,
+	BIGINT* i1, BIGINT* i2, BIGINT* i3,
+	BIGINT N1, BIGINT N2, BIGINT N3, BIGINT M,
+	BIGINT begin, BIGINT end, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals2 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals3 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, 0, M, opts);
+	evaluate_kernel(kernel_vals2, x2, 0, M, opts);
+	evaluate_kernel(kernel_vals3, x3, 0, M, opts);
+
+
+	interp_cube<FLT>(sort_indices, data_nonuniform, du_padded,
+		kernel_vals1, kernel_vals2, kernel_vals3,
+		i1, i2, i3,
+		N1, N2, N3,
+		ns, M);
+
+	_mm_free(kernel_vals3);
+	_mm_free(kernel_vals2);
+	_mm_free(kernel_vals1);
 }
 
 // --------------------------------------------------------------------------
 int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
-    FLT* data_uniform, BIGINT M, FLT* kx, FLT* ky, FLT* kz,
-    FLT* data_nonuniform, spread_opts opts, int did_sort)
-    // Interpolate to NU pts in sorted order from a uniform grid.
-    // See spreadinterp() for doc.
+	FLT* data_uniform, BIGINT M, FLT* kx, FLT* ky, FLT* kz,
+	FLT* data_nonuniform, spread_opts opts, int did_sort)
+	// Interpolate to NU pts in sorted order from a uniform grid.
+	// See spreadinterp() for doc.
 {
-    CNTime timer;
-    int ndims = ndims_from_Ns(N1, N2, N3);
+	CNTime timer;
+	int ndims = ndims_from_Ns(N1, N2, N3);
 
-    int ns = opts.nspread;          // abbrev. for w, kernel width
-    FLT ns2 = (FLT)ns / 2;          // half spread width, used as stencil shift
-    int nthr = MY_OMP_GET_MAX_THREADS();   // # threads to use to interp
-    int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
-    if (opts.nthreads > 0)
-        nthr = min(nthr, opts.nthreads);      // user override up to max avail
-    if (opts.debug)
-        printf("\tinterp %dD (M=%lld; N1=%lld,N2=%lld,N3=%lld; pir=%d), nthr=%d\n", ndims, (long long)M, (long long)N1, (long long)N2, (long long)N3, opts.pirange, nthr);
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	FLT ns2 = (FLT)ns / 2;          // half spread width, used as stencil shift
+	int nthr = MY_OMP_GET_MAX_THREADS();   // # threads to use to interp
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+	if (opts.nthreads > 0)
+		nthr = min(nthr, opts.nthreads);      // user override up to max avail
+	if (opts.debug)
+		printf("\tinterp %dD (M=%lld; N1=%lld,N2=%lld,N3=%lld; pir=%d), nthr=%d\n", ndims, (long long)M, (long long)N1, (long long)N2, (long long)N3, opts.pirange, nthr);
 
-    timer.start();
+	timer.start();
 
-    BIGINT* i1 = NULL, * i2 = NULL, * i3 = NULL;
-    FLT* x1 = NULL, * x2 = NULL, * x3 = NULL;
-    FLT* kernel_vals1 = NULL, * kernel_vals2 = NULL, * kernel_vals3 = NULL;
+	BIGINT paddedN = 1, paddedN1, paddedN2, paddedN3;
+	switch (ndims) {
+	case 3:
+		paddedN3 = N3 + 2 * MAX_NSPREAD;
+		paddedN *= paddedN3;
+		// fall through
+	case 2:
+		paddedN2 = N2 + 2 * MAX_NSPREAD;
+		paddedN *= paddedN2;
+		// fall through
+	case 1:
+		paddedN1 = N1 + 2 * MAX_NSPREAD;
+		paddedN *= paddedN1;
+		break;
+	}
 
-    switch (ndims) {
-    case 3:
-        i3 = (BIGINT*)malloc(sizeof(BIGINT) * M);
-        x3 = (FLT*)malloc(sizeof(FLT) * M);
-        kernel_vals3 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
-        // Fall through
-    case 2:
-        i2 = (BIGINT*)malloc(sizeof(BIGINT) * M);
-        x2 = (FLT*)malloc(sizeof(FLT) * M);
-        kernel_vals2 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
-        // Fall through
-    case 1:
-        i1 = (BIGINT*)malloc(sizeof(BIGINT) * M);
-        x1 = (FLT*)malloc(sizeof(FLT) * M);
-        kernel_vals1 = (FLT*)_mm_malloc(nsPadded * M * sizeof(FLT), 64);
-        break;
-    }
+	FLT* du_padded = (FLT*)malloc(2 * sizeof(FLT) * paddedN);
 
-    BIGINT paddedN = 1, paddedN1, paddedN2, paddedN3;
-    switch (ndims) {
-    case 3:
-        paddedN3 = N3 + 2 * MAX_NSPREAD;
-        paddedN *= paddedN3;
-        // fall through
-    case 2:
-        paddedN2 = N2 + 2 * MAX_NSPREAD;
-        paddedN *= paddedN2;
-        // fall through
-    case 1:
-        paddedN1 = N1 + 2 * MAX_NSPREAD;
-        paddedN *= paddedN1;
-        break;
-    }
+	// eval kernel values patch and use to interpolate from uniform data...
+	if (!(opts.flags & TF_OMIT_SPREADING)) {
+		switch (ndims) {
+		case 1:
+			padData_1d(data_uniform, du_padded, N1);
 
-    FLT* du_padded = (FLT*)malloc(2 * sizeof(FLT) * paddedN);
+			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
+				[&](const tbb::blocked_range<BIGINT>& r) {
+					BIGINT* i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					FLT* x1 = (FLT*)malloc(sizeof(FLT) * r.size());
 
-    // eval kernel values patch and use to interpolate from uniform data...
-    if (!(opts.flags & TF_OMIT_SPREADING)) {
-        switch (ndims) {
-        case 1:
-            padData_1d(data_uniform, du_padded, N1);
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
 
-            tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
-                [&](const tbb::blocked_range<BIGINT>& r) {
-                    foldrescale(sort_indices, kx, i1, x1, N1, r.begin(), r.end(), opts);
+					combined_eval_interp_1d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD,
+						x1,
+						i1,
+						N1, r.size(),
+						r.begin(), r.end(), opts);
 
-                    evaluate_kernel(kernel_vals1, x1, r.begin(), r.end(), opts);
+					free(x1);
+					free(i1);
+				});
+			break;
+		case 2:
+			padData_2d(data_uniform, du_padded, N1, N2);
 
-                    interp_line<FLT>(sort_indices, data_nonuniform, du_padded + 2 * MAX_NSPREAD,
-                        kernel_vals1,
-                        i1,
-                        N1,
-                        ns, r.begin(), r.end());
-                });
-            break;
-        case 2:
-            padData_2d(data_uniform, du_padded, N1, N2);
+			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
+				[&](const tbb::blocked_range<BIGINT>& r) {
+					BIGINT* i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					BIGINT* i2 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					FLT* x1 = (FLT*)malloc(sizeof(FLT) * r.size());
+					FLT* x2 = (FLT*)malloc(sizeof(FLT) * r.size());
 
-            tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
-                [&](const tbb::blocked_range<BIGINT>& r) {
-                    foldrescale(sort_indices, kx, i1, x1, N1, r.begin(), r.end(), opts);
-                    foldrescale(sort_indices, ky, i2, x2, N2, r.begin(), r.end(), opts);
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, 0, r.size(), opts);
 
-                    evaluate_kernel(kernel_vals1, x1, r.begin(), r.end(), opts);
-                    evaluate_kernel(kernel_vals2, x2, r.begin(), r.end(), opts);
+					combined_eval_interp_2d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 + 1),
+						x1, x2,
+						i1, i2,
+						N1, N2, r.size(),
+						r.begin(), r.end(), opts);
 
-                    interp_square<FLT>(sort_indices, data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 + 1),
-                        kernel_vals1, kernel_vals2,
-                        i1, i2,
-                        N1, N2,
-                        ns, r.begin(), r.end());
-                });
-            break;
-        case 3:
-            padData_3d(data_uniform, du_padded, N1, N2, N3);
+					free(x1); free(x2);
+					free(i1); free(i2);
+				});
+			break;
+		case 3:
+			padData_3d(data_uniform, du_padded, N1, N2, N3);
 
-            tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
-                [&](const tbb::blocked_range<BIGINT>& r) {
-                    foldrescale(sort_indices, kx, i1, x1, N1, r.begin(), r.end(), opts);
-                    foldrescale(sort_indices, ky, i2, x2, N2, r.begin(), r.end(), opts);
-                    foldrescale(sort_indices, kz, i3, x3, N3, r.begin(), r.end(), opts);
+			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
+				[&](const tbb::blocked_range<BIGINT>& r) {
+					BIGINT* i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					BIGINT* i2 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					BIGINT* i3 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
+					FLT* x1 = (FLT*)malloc(sizeof(FLT) * r.size());
+					FLT* x2 = (FLT*)malloc(sizeof(FLT) * r.size());
+					FLT* x3 = (FLT*)malloc(sizeof(FLT) * r.size());
 
-                    evaluate_kernel(kernel_vals1, x1, r.begin(), r.end(), opts);
-                    evaluate_kernel(kernel_vals2, x2, r.begin(), r.end(), opts);
-                    evaluate_kernel(kernel_vals3, x3, r.begin(), r.end(), opts);
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, 0, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), kz, i3, x3, N3, 0, r.size(), opts);
 
+					combined_eval_interp_3d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 * paddedN2 + paddedN1 + 1),
+						x1, x2, x3,
+						i1, i2, i3,
+						N1, N2, N3, r.size(),
+						r.begin(), r.end(), opts);
 
-                    interp_cube<FLT>(sort_indices, data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 * paddedN2 + paddedN1 + 1),
-                        kernel_vals1, kernel_vals2, kernel_vals3,
-                        i1, i2, i3,
-                        N1, N2, N3,
-                        ns, r.begin(), r.end());
-                });
-            break;
-        default: //can't get here
-            break;
-        }
-    }
+					free(x1); free(x2); free(x3);
+					free(i1); free(i2); free(i3);
+				});
+			break;
+		default: //can't get here
+			break;
+		}
+	}
 
-    free(du_padded);
+	free(du_padded);
 
-    switch (ndims) {
-    case 3:
-        _mm_free(kernel_vals3);
-		free(x3);
-		free(i3);
-        // Fall through
-    case 2:
-		_mm_free(kernel_vals2);
-		free(x2);
-		free(i2);
-        // Fall through
-    case 1:
-		_mm_free(kernel_vals1);
-		free(x1);
-		free(i1);
-    }
-
-    if (opts.debug) printf("\tt2 spreading loop: \t%.3g s\n", timer.elapsedsec());
-    return 0;
+	if (opts.debug) printf("\tt2 spreading loop: \t%.3g s\n", timer.elapsedsec());
+	return 0;
 };
 
 
@@ -725,16 +829,16 @@ int setup_spreader(spread_opts& opts, FLT eps, double upsampfac,
 	return ier;
 }
 
-void add_wrapped_subgrid(BIGINT offset1,BIGINT offset2,BIGINT offset3,
-			 BIGINT size1,BIGINT size2,BIGINT size3,BIGINT N1,
-			 BIGINT N2,BIGINT N3,FLT *data_uniform, FLT *du0)
-/* Add a large subgrid (du0) to output grid (data_uniform),
-   with periodic wrapping to N1,N2,N3 box.
-   offset1,2,3 give the offset of the subgrid from the lowest corner of output.
-   size1,2,3 give the size of subgrid.
-   Works in all dims. Not thread-safe and must be called inside omp critical.
-   Barnett 3/27/18 made separate routine, tried to speed up inner loop.
-*/
+void add_wrapped_subgrid(BIGINT offset1, BIGINT offset2, BIGINT offset3,
+	BIGINT size1, BIGINT size2, BIGINT size3, BIGINT N1,
+	BIGINT N2, BIGINT N3, FLT* data_uniform, FLT* du0)
+	/* Add a large subgrid (du0) to output grid (data_uniform),
+	   with periodic wrapping to N1,N2,N3 box.
+	   offset1,2,3 give the offset of the subgrid from the lowest corner of output.
+	   size1,2,3 give the size of subgrid.
+	   Works in all dims. Not thread-safe and must be called inside omp critical.
+	   Barnett 3/27/18 made separate routine, tried to speed up inner loop.
+	*/
 {
 	std::vector<BIGINT> o2(size2), o3(size3);
 	BIGINT y = offset2, z = offset3;    // fill wrapped ptr lists in slower dims y,z...
