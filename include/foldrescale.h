@@ -43,7 +43,7 @@ void foldrescale(BIGINT* sort_indices, T* kx, BIGINT* idx, T* x, BIGINT N, BIGIN
 
 #ifdef __AVX2__ // __AVX512VL__
 template<>
-void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, double* x, BIGINT N, BIGINT begin, BIGINT end, const spread_opts& opts)
+inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, double* x, BIGINT N, BIGINT begin, BIGINT end, const spread_opts& opts)
 {
 	const int ns = opts.nspread;          // abbrev. for w, kernel width
 	const double ns2 = (double)ns / 2;          // half spread width, used as stencil shift
@@ -116,7 +116,7 @@ void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, double* 
 }
 
 template<>
-void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, float* x, BIGINT N, BIGINT begin, BIGINT end, const spread_opts& opts)
+inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, float* x, BIGINT N, BIGINT begin, BIGINT end, const spread_opts& opts)
 {
 	const int ns = opts.nspread;          // abbrev. for w, kernel width
 	const float ns2 = (float)ns / 2;          // half spread width, used as stencil shift

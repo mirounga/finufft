@@ -56,12 +56,12 @@ void spread_subproblem_1d(BIGINT* sort_indices, BIGINT off1, BIGINT size1, T* du
 }
 
 #ifdef __AVX2__
-#ifdef __AVX2__ //__AVX512F__
+#ifdef __AVX512F__
 template<>
 inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGINT size1, double* du, double* dd,
 	BIGINT* i1,
 	double* kernel_vals1,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;          // a.k.a. w
 	double ns2 = (double)ns / 2;          // half spread width
@@ -69,11 +69,11 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 	for (BIGINT i = 0; i < 2 * size1; ++i)         // zero output
 		du[i] = 0.0;
 
-	double* pKer1 = kernel_vals1 + begin * nsPadded;
+	double* pKer1 = kernel_vals1;
 
 	switch (nsPadded) {
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -109,7 +109,7 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -154,7 +154,7 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 		}
 		break;
 	case 16:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m256d _dd0 = _mm256_permute4x64_pd(
 				_mm256_castpd128_pd256(_mm_load_pd(dd + 2 * si)),
@@ -213,7 +213,7 @@ inline void spread_subproblem_1d<double>(BIGINT* sort_indices, BIGINT off1, BIGI
 		}
 		break;
 	default:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m128d _dd0 = _mm_load_pd(dd + 2 * si);
 
@@ -240,7 +240,7 @@ template<>
 inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGINT size1, float* du, float* dd,
 	BIGINT* i1,
 	float* kernel_vals1,
-	BIGINT begin, BIGINT end, const spread_opts& opts)
+	BIGINT size, const spread_opts& opts)
 {
 	int ns = opts.nspread;          // a.k.a. w
 	float ns2 = (float)ns / 2;          // half spread width
@@ -248,7 +248,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 	for (BIGINT i = 0; i < 2 * size1; ++i)         // zero output
 		du[i] = 0.0;
 
-	float* pKer1 = kernel_vals1 + begin * nsPadded;
+	float* pKer1 = kernel_vals1;
 
 	__m512i _broadcast2 = _mm512_set_epi32(1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0);
 	__m512i _spreadlo = _mm512_set_epi32(7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0);
@@ -256,7 +256,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 
 	switch (nsPadded) {
 	case 4:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
@@ -278,7 +278,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 		}
 		break;
 	case 8:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
@@ -300,7 +300,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 		}
 		break;
 	case 12:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
@@ -326,7 +326,7 @@ inline void spread_subproblem_1d<float>(BIGINT* sort_indices, BIGINT off1, BIGIN
 		}
 		break;
 	case 16:
-		for (BIGINT i = begin; i < end; i++) {           // loop over NU pts
+		for (BIGINT i = 0; i < size; i++) {           // loop over NU pts
 			BIGINT si = sort_indices[i];
 			__m512 _d0 = _mm512_maskz_loadu_ps(0x03, dd + 2 * si);
 			__m512 _dd0 = _mm512_permutexvar_ps(_broadcast2, _d0);
