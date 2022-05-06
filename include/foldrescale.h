@@ -41,7 +41,7 @@ void foldrescale(BIGINT* sort_indices, T* kx, BIGINT* idx, T* x, BIGINT N, BIGIN
 	}
 }
 
-#ifdef __AVX2__ // __AVX512VL__
+#ifdef __AVX512DQ__
 template<>
 inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, double* x, BIGINT N, BIGINT size, const spread_opts& opts)
 {
@@ -126,34 +126,94 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 		__m256 _nn = _mm256_set1_ps(static_cast<float>(N));
 		__m256 _ns2 = _mm256_set1_ps(ns2);
 
-		BIGINT size8 = size & ~0x07;
+		BIGINT size32 = size & ~0x01f;
 
-		for (BIGINT i = 0; i < size8; i += 8)
+		for (BIGINT i = 0; i < size32; i += 32)
 		{
-			__m512i _si0 = _mm512_loadu_epi64(sort_indices + i);
+			__m512i _si0 = _mm512_loadu_epi64(sort_indices + i + 0);
+			__m512i _si1 = _mm512_loadu_epi64(sort_indices + i + 8);
+			__m512i _si2 = _mm512_loadu_epi64(sort_indices + i + 16);
+			__m512i _si3 = _mm512_loadu_epi64(sort_indices + i + 24);
 
 			__m256 _kx0 = _mm512_i64gather_ps(_si0, kx, 4);
+			__m256 _kx1 = _mm512_i64gather_ps(_si1, kx, 4);
+			__m256 _kx2 = _mm512_i64gather_ps(_si2, kx, 4);
+			__m256 _kx3 = _mm512_i64gather_ps(_si3, kx, 4);
 
 			__m256 _kx0_minus_n = _mm256_sub_ps(_kx0, _nn);
-			__m256 _kx0_plus_n = _mm256_add_ps(_kx0, _nn);
+			__m256 _kx1_minus_n = _mm256_sub_ps(_kx1, _nn);
+			__m256 _kx2_minus_n = _mm256_sub_ps(_kx2, _nn);
+			__m256 _kx3_minus_n = _mm256_sub_ps(_kx3, _nn);
 
 			__mmask8 _cmpb0 = _mm256_cmp_ps_mask(_kx0, _nn, _CMP_NGE_UQ);
-			__mmask8 _cmpa0 = _mm256_cmp_ps_mask(_kx0, _zero, _CMP_NLT_UQ);
+			__mmask8 _cmpb1 = _mm256_cmp_ps_mask(_kx1, _nn, _CMP_NGE_UQ);
+			__mmask8 _cmpb2 = _mm256_cmp_ps_mask(_kx2, _nn, _CMP_NGE_UQ);
+			__mmask8 _cmpb3 = _mm256_cmp_ps_mask(_kx3, _nn, _CMP_NGE_UQ);
+
 			__m256 _tmpb0 = _mm256_mask_blend_ps(_cmpb0, _kx0_minus_n, _kx0);
-			__m256 _xj0 = _mm256_mask_blend_ps(_cmpa0, _tmpb0, _kx0_plus_n);
+			__m256 _tmpb1 = _mm256_mask_blend_ps(_cmpb1, _kx1_minus_n, _kx1);
+			__m256 _tmpb2 = _mm256_mask_blend_ps(_cmpb2, _kx2_minus_n, _kx2);
+			__m256 _tmpb3 = _mm256_mask_blend_ps(_cmpb3, _kx3_minus_n, _kx3);
+
+			__m256 _kx0_plus_n = _mm256_add_ps(_kx0, _nn);
+			__m256 _kx1_plus_n = _mm256_add_ps(_kx1, _nn);
+			__m256 _kx2_plus_n = _mm256_add_ps(_kx2, _nn);
+			__m256 _kx3_plus_n = _mm256_add_ps(_kx3, _nn);
+
+			__mmask8 _cmpa0 = _mm256_cmp_ps_mask(_kx0, _zero, _CMP_NLT_UQ);
+			__mmask8 _cmpa1 = _mm256_cmp_ps_mask(_kx1, _zero, _CMP_NLT_UQ);
+			__mmask8 _cmpa2 = _mm256_cmp_ps_mask(_kx2, _zero, _CMP_NLT_UQ);
+			__mmask8 _cmpa3 = _mm256_cmp_ps_mask(_kx3, _zero, _CMP_NLT_UQ);
+
+			__m256 _xj0 = _mm256_mask_blend_ps(_cmpa0, _kx0_plus_n, _tmpb0);
+			__m256 _xj1 = _mm256_mask_blend_ps(_cmpa1, _kx1_plus_n, _tmpb1);
+			__m256 _xj2 = _mm256_mask_blend_ps(_cmpa2, _kx2_plus_n, _tmpb2);
+			__m256 _xj3 = _mm256_mask_blend_ps(_cmpa3, _kx3_plus_n, _tmpb3);
 
 			__m256 _c0 = _mm256_ceil_ps(_mm256_sub_ps(_xj0, _ns2));
+			__m256 _c1 = _mm256_ceil_ps(_mm256_sub_ps(_xj1, _ns2));
+			__m256 _c2 = _mm256_ceil_ps(_mm256_sub_ps(_xj2, _ns2));
+			__m256 _c3 = _mm256_ceil_ps(_mm256_sub_ps(_xj3, _ns2));
 
 			__m256 _x0 = _mm256_sub_ps(_c0, _xj0);
+			__m256 _x1 = _mm256_sub_ps(_c1, _xj1);
+			__m256 _x2 = _mm256_sub_ps(_c2, _xj2);
+			__m256 _x3 = _mm256_sub_ps(_c3, _xj3);
 
 			__m512i _idx0 = _mm512_cvtps_epi64(_c0);
+			__m512i _idx1 = _mm512_cvtps_epi64(_c1);
+			__m512i _idx2 = _mm512_cvtps_epi64(_c2);
+			__m512i _idx3 = _mm512_cvtps_epi64(_c3);
 
-			_mm256_store_ps(x + i, _x0);
+			_mm256_store_ps(x + i + 0, _x0);
+			_mm256_store_ps(x + i + 8, _x1);
+			_mm256_store_ps(x + i + 16, _x2);
+			_mm256_store_ps(x + i + 24, _x3);
 
-			_mm512_store_epi64(idx + i, _idx0);
+			_mm512_store_epi64(idx + i + 0, _idx0);
+			_mm512_store_epi64(idx + i + 8, _idx1);
+			_mm512_store_epi64(idx + i + 16, _idx2);
+			_mm512_store_epi64(idx + i + 24, _idx3);
+
+			//for (int di = 0; di < 32; di++) {
+			//	BIGINT si = sort_indices[i + di];
+
+			//	float xj = FOLDRESCALE(kx[si], N, 0);
+
+			//	// coords (x,y,z), spread block corner index (i1,i2,i3) of current NU targ
+			//	FLT c = std::ceil(xj - ns2); // leftmost grid index
+
+			//	// shift of ker center, in [-w/2,-w/2+1]
+			//	float x_i = c - xj;
+
+			//	BIGINT idx_i = (BIGINT)c;
+
+			//	assert(x[i + di] == x_i);
+			//	assert(idx[i + di] == idx_i);
+			//}
 		}
 
-		for (BIGINT i = size8; i < size; i++)
+		for (BIGINT i = size32; i < size; i++)
 		{
 			BIGINT si = sort_indices[i];
 
