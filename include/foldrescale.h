@@ -20,12 +20,12 @@ T FOLDRESCALE(T x, BIGINT N, int p) {
 }
 
 template<class T>
-void foldrescale(BIGINT* sort_indices, T* kx, BIGINT* idx, T* x, BIGINT N, BIGINT begin, BIGINT end, const spread_opts& opts)
+void foldrescale(BIGINT* sort_indices, T* kx, BIGINT* idx, T* x, BIGINT N, BIGINT size, const spread_opts& opts)
 {
 	const int ns = opts.nspread;          // abbrev. for w, kernel width
 	const T ns2 = (T)ns / 2;          // half spread width, used as stencil shift
 
-	for (BIGINT i = begin; i < end; i++)
+	for (BIGINT i = 0; i < size; i++)
 	{
 		BIGINT si = sort_indices[i];
 
@@ -43,7 +43,7 @@ void foldrescale(BIGINT* sort_indices, T* kx, BIGINT* idx, T* x, BIGINT N, BIGIN
 
 #ifdef __AVX2__ // __AVX512VL__
 template<>
-inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, double* x, BIGINT N, BIGINT begin, BIGINT end, const spread_opts& opts)
+inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, double* x, BIGINT N, BIGINT size, const spread_opts& opts)
 {
 	const int ns = opts.nspread;          // abbrev. for w, kernel width
 	const double ns2 = (double)ns / 2;          // half spread width, used as stencil shift
@@ -55,9 +55,9 @@ inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, d
 		__m512d _n_two_pi = _mm512_set1_pd(M_1_2PI * N);
 		__m512d _ns2 = _mm512_set1_pd(ns2);
 
-		BIGINT end8 = begin + ((end - begin) & ~0x07);
+		BIGINT size8 = size & ~0x07;
 
-		for (BIGINT i = begin; i < end8; i+=8)
+		for (BIGINT i = 0; i < size8; i+=8)
 		{ 
 			__m512i _si0 = _mm512_loadu_epi64(sort_indices + i);
 
@@ -77,12 +77,12 @@ inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, d
 
 			__m512i _idx0 = _mm512_cvtpd_epi64(_c0);
 
-			_mm512_storeu_pd(x + i, _x0);
+			_mm512_store_pd(x + i, _x0);
 
-			_mm512_storeu_epi64(idx + i, _idx0);
+			_mm512_store_epi64(idx + i, _idx0);
 		}
 
-		for (BIGINT i = end8; i < end; i++)
+		for (BIGINT i = size8; i < size; i++)
 		{ 
 			BIGINT si = sort_indices[i];
 
@@ -98,7 +98,7 @@ inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, d
 		}
 	}
 	else {
-		for (BIGINT i = begin; i < end; i++)
+		for (BIGINT i = 0; i < size; i++)
 		{
 			BIGINT si = sort_indices[i];
 
@@ -116,7 +116,7 @@ inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, d
 }
 
 template<>
-inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, float* x, BIGINT N, BIGINT begin, BIGINT end, const spread_opts& opts)
+inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, float* x, BIGINT N, BIGINT size, const spread_opts& opts)
 {
 	const int ns = opts.nspread;          // abbrev. for w, kernel width
 	const float ns2 = (float)ns / 2;          // half spread width, used as stencil shift
@@ -126,9 +126,9 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 		__m256 _nn = _mm256_set1_ps(static_cast<float>(N));
 		__m256 _ns2 = _mm256_set1_ps(ns2);
 
-		BIGINT end8 = begin + ((end - begin) & ~0x07);
+		BIGINT size8 = size & ~0x07;
 
-		for (BIGINT i = begin; i < end8; i += 8)
+		for (BIGINT i = 0; i < size8; i += 8)
 		{
 			__m512i _si0 = _mm512_loadu_epi64(sort_indices + i);
 
@@ -148,12 +148,12 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 
 			__m512i _idx0 = _mm512_cvtps_epi64(_c0);
 
-			_mm256_storeu_ps(x + i, _x0);
+			_mm256_store_ps(x + i, _x0);
 
-			_mm512_storeu_epi64(idx + i, _idx0);
+			_mm512_store_epi64(idx + i, _idx0);
 		}
 
-		for (BIGINT i = end8; i < end; i++)
+		for (BIGINT i = size8; i < size; i++)
 		{
 			BIGINT si = sort_indices[i];
 
@@ -175,9 +175,9 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 		__m256 _n_two_pi = _mm256_set1_ps(M_1_2PI * N);
 		__m256 _ns2 = _mm256_set1_ps(ns2);
 
-		BIGINT end8 = begin + ((end - begin) & ~0x07);
+		BIGINT size8 = size & ~0x07;
 
-		for (BIGINT i = begin; i < end8; i+=8)
+		for (BIGINT i = 0; i < size8; i+=8)
 		{ 
 			__m512i _si0 = _mm512_loadu_epi64(sort_indices + i);
 
@@ -197,12 +197,12 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 
 			__m512i _idx0 = _mm512_cvtps_epi64(_c0);
 
-			_mm256_storeu_ps(x + i, _x0);
+			_mm256_store_ps(x + i, _x0);
 
-			_mm512_storeu_epi64(idx + i, _idx0);
+			_mm512_store_epi64(idx + i, _idx0);
 		}
 
-		for (BIGINT i = end8; i < end; i++)
+		for (BIGINT i = size8; i < size; i++)
 		{ 
 			BIGINT si = sort_indices[i];
 

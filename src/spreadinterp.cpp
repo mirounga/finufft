@@ -410,21 +410,21 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 
 				switch (ndims) {
 				case 3:
-					i3 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					x3 = (FLT*)malloc(sizeof(FLT) * r.size());
-					foldrescale<FLT>(sort_indices + r.begin(), kz, i3, x3, N3, 0, r.size(), opts);
+					i3 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					x3 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
+					foldrescale<FLT>(sort_indices + r.begin(), kz, i3, x3, N3, r.size(), opts);
 					get_subgrid(offset3, size3, i3, r.size(), ns);
 					// Fall through
 				case 2:
-					i2 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					x2 = (FLT*)malloc(sizeof(FLT) * r.size());
-					foldrescale<FLT>(sort_indices + r.begin(), ky, i2, x2, N2, 0, r.size(), opts);
+					i2 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					x2 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
+					foldrescale<FLT>(sort_indices + r.begin(), ky, i2, x2, N2, r.size(), opts);
 					get_subgrid(offset2, size2, i2, r.size(), ns);
 					// Fall through
 				case 1:
-					i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					x1 = (FLT*)malloc(sizeof(FLT) * r.size());
-					foldrescale<FLT>(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
+					i1 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					x1 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
+					foldrescale<FLT>(sort_indices + r.begin(), kx, i1, x1, N1, r.size(), opts);
 					get_subgrid(offset1, size1, i1, r.size(), ns);
 					break;
 				}
@@ -495,16 +495,16 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 
 				switch (ndims) {
 				case 3:
-					free(x3);
-					free(i3);
+					_mm_free(x3);
+					_mm_free(i3);
 					// Fall through
 				case 2:
-					free(x2);
-					free(i2);
+					_mm_free(x2);
+					_mm_free(i2);
 					// Fall through
 				case 1:
-					free(x1);
-					free(i1);
+					_mm_free(x1);
+					_mm_free(i1);
 				}
 			}); // end main loop over subprobs
 
@@ -663,10 +663,10 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 
 			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
 				[&](const tbb::blocked_range<BIGINT>& r) {
-					BIGINT* i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					FLT* x1 = (FLT*)malloc(sizeof(FLT) * r.size());
+					BIGINT* i1 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					FLT* x1 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
 
-					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, r.size(), opts);
 
 					combined_eval_interp_1d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD,
 						x1,
@@ -674,8 +674,8 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 						N1, r.size(),
 						r.begin(), r.end(), opts);
 
-					free(x1);
-					free(i1);
+					_mm_free(x1);
+					_mm_free(i1);
 				});
 			break;
 		case 2:
@@ -683,13 +683,13 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 
 			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
 				[&](const tbb::blocked_range<BIGINT>& r) {
-					BIGINT* i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					BIGINT* i2 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					FLT* x1 = (FLT*)malloc(sizeof(FLT) * r.size());
-					FLT* x2 = (FLT*)malloc(sizeof(FLT) * r.size());
+					BIGINT* i1 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					BIGINT* i2 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					FLT* x1 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
+					FLT* x2 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
 
-					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
-					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, 0, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, r.size(), opts);
 
 					combined_eval_interp_2d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 + 1),
 						x1, x2,
@@ -697,8 +697,8 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 						N1, N2, r.size(),
 						r.begin(), r.end(), opts);
 
-					free(x1); free(x2);
-					free(i1); free(i2);
+					_mm_free(x1); _mm_free(x2);
+					_mm_free(i1); _mm_free(i2);
 				});
 			break;
 		case 3:
@@ -706,16 +706,16 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 
 			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
 				[&](const tbb::blocked_range<BIGINT>& r) {
-					BIGINT* i1 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					BIGINT* i2 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					BIGINT* i3 = (BIGINT*)malloc(sizeof(BIGINT) * r.size());
-					FLT* x1 = (FLT*)malloc(sizeof(FLT) * r.size());
-					FLT* x2 = (FLT*)malloc(sizeof(FLT) * r.size());
-					FLT* x3 = (FLT*)malloc(sizeof(FLT) * r.size());
+					BIGINT* i1 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					BIGINT* i2 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					BIGINT* i3 = (BIGINT*)_mm_malloc(sizeof(BIGINT) * r.size(), 64);
+					FLT* x1 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
+					FLT* x2 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
+					FLT* x3 = (FLT*)_mm_malloc(sizeof(FLT) * r.size(), 64);
 
-					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, 0, r.size(), opts);
-					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, 0, r.size(), opts);
-					foldrescale(sort_indices + r.begin(), kz, i3, x3, N3, 0, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), kz, i3, x3, N3, r.size(), opts);
 
 					combined_eval_interp_3d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 * paddedN2 + paddedN1 + 1),
 						x1, x2, x3,
@@ -723,8 +723,8 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 						N1, N2, N3, r.size(),
 						r.begin(), r.end(), opts);
 
-					free(x1); free(x2); free(x3);
-					free(i1); free(i2); free(i3);
+					_mm_free(x1); _mm_free(x2); _mm_free(x3);
+					_mm_free(i1); _mm_free(i2); _mm_free(i3);
 				});
 			break;
 		default: //can't get here
