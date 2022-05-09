@@ -632,14 +632,14 @@ inline void eval_kernel_bulk_generic<7, 10>(const float* c, float* kernel_vals, 
 		_k_mn = _mm512_fmadd_ps(_k_mn, _z_mn, _c0);
 		_k_op = _mm512_fmadd_ps(_k_op, _z_op, _c0);
 
-		_mm512_storeu_ps(ker + 0, _k_ab);
-		_mm512_storeu_ps(ker + 16, _k_cd);
-		_mm512_storeu_ps(ker + 32, _k_ef);
-		_mm512_storeu_ps(ker + 48, _k_gh);
-		_mm512_storeu_ps(ker + 64, _k_ij);
-		_mm512_storeu_ps(ker + 80, _k_kl);
-		_mm512_storeu_ps(ker + 96, _k_mn);
-		_mm512_storeu_ps(ker + 112, _k_op);
+		_mm512_store_ps(ker + 0, _k_ab);
+		_mm512_store_ps(ker + 16, _k_cd);
+		_mm512_store_ps(ker + 32, _k_ef);
+		_mm512_store_ps(ker + 48, _k_gh);
+		_mm512_store_ps(ker + 64, _k_ij);
+		_mm512_store_ps(ker + 80, _k_kl);
+		_mm512_store_ps(ker + 96, _k_mn);
+		_mm512_store_ps(ker + 112, _k_op);
 
 		ker += 128;
 	}
@@ -1213,13 +1213,14 @@ alignas(64) constexpr T c200g[] = {
 	T(1.1808835093099178E-02), T(-2.5444299558662394E-02), T(-1.5661344238792723E-04), T(2.5820071204205225E-01), T(-1.0930950485268096E+00), T(2.6408492552008669E+00), T(-4.4415763059111955E+00), T(6.8227366238712817E+00), T(-6.8186662643534008E+00), T(4.4887924763186051E+00), T(-2.6327085361651021E+00), T(1.0918739406714428E+00), T(-2.5844238963842503E-01), T(1.2680123888735934E-04), T(2.5444206395526567E-02), T(-1.1808834826225629E-02) };
 
 template<typename T>
-void eval_kernel_bulk_Horner(T* kernel_vals, T* x1, const int w, const BIGINT size,
+void evaluate_kernel(T* kernel_vals, T* x1, const BIGINT size,
 	const spread_opts& opts)
 	/* Fill ker[] with Horner piecewise poly approx to [-w/2,w/2] ES kernel eval at
 	   x_j = x + j,  for j=0,..,w-1.  Thus x in [-w/2,-w/2+1].   w is aka ns.
 	   This is the current evaluation method, since it's faster (except i7 w=16).
 	   Two upsampfacs implemented. Params must match ref formula. Barnett 4/24/18 */
 {
+	const int w = opts.nspread;
 
 	if (!(opts.flags & TF_OMIT_EVALUATE_KERNEL)) {
 		// insert the auto-generated code which expects z, w args, writes to ker...
@@ -1326,7 +1327,8 @@ void eval_kernel_bulk_Horner(T* kernel_vals, T* x1, const int w, const BIGINT si
 	}
 }
 
-FLT evaluate_kernel(FLT x, const spread_opts& opts)
+template<typename T>
+T evaluate_kernel(T x, const spread_opts& opts)
 /* ES ("exp sqrt") kernel evaluation at single real argument:
 	  phi(x) = exp(beta.sqrt(1 - (2x/n_s)^2)),    for |x| < nspread/2
    related to an asymptotic approximation to the Kaiser--Bessel, itself an
@@ -1336,94 +1338,8 @@ FLT evaluate_kernel(FLT x, const spread_opts& opts)
 {
 	if (abs(x) >= opts.ES_halfwidth)
 		// if spreading/FT careful, shouldn't need this i), T(but causes no speed hit
-		return 0.0;
+		return T(0.0);
 	else
-		return exp(opts.ES_beta * sqrt(1.0 - opts.ES_c * x * x));
-}
-
-static inline void set_kernel_args(FLT* args, FLT x, const spread_opts& opts)
-// Fills vector args[] with kernel arguments x, x+1, ..., x+ns-1.
-// needed for the vectorized kernel eval of Ludvig af K.
-{
-	int ns = opts.nspread;
-	for (int i = 0; i < ns; i++)
-		args[i] = x + (FLT)i;
-}
-
-static inline void evaluate_kernel_vector(FLT* ker, FLT* args, const spread_opts& opts, const int N)
-/* Evaluate ES kernel for a vector of N arguments; by Ludvig af K.
-   If opts.kerpad true, args and ker must be allocated for Npad, and args is
-   written to (to pad to length Npad), only first N outputs are correct.
-   Barnett 4/24/18 option to pad to mult of 4 for better SIMD vectorization.
-
-   Obsolete (replaced by Horner), but keep around for experimentation since
-   works for arbitrary beta. Formula must match reference implementation. */
-{
-	FLT b = opts.ES_beta;
-	FLT c = opts.ES_c;
-	if (!(opts.flags & TF_OMIT_EVALUATE_KERNEL)) {
-		// Note (by Ludvig af K): Splitting kernel evaluation into two loops
-		// seems to benefit auto-vectorization.
-		// gcc 5.4 vectorizes first loop; gcc 7.2 vectorizes both loops
-		int Npad = N;
-		if (opts.kerpad) {        // since always same branch, no speed hit
-			Npad = 4 * (1 + (N - 1) / 4);   // pad N to mult of 4; help i7 GCC, not xeon
-			for (int i = N; i < Npad; ++i)    // pad with 1-3 zeros for safe eval
-				args[i] = 0.0;
-		}
-		for (int i = 0; i < Npad; i++) { // Loop 1: Compute exponential arguments
-			ker[i] = b * sqrt(1.0 - c * args[i] * args[i]);
-		}
-		if (!(opts.flags & TF_OMIT_EVALUATE_EXPONENTIAL))
-			for (int i = 0; i < Npad; i++) // Loop 2: Compute exponentials
-				ker[i] = exp(ker[i]);
-	}
-	else {
-		for (int i = 0; i < N; i++)             // dummy for timing only
-			ker[i] = 1.0;
-	}
-	// Separate check from arithmetic (Is this really needed? doesn't slow down)
-	for (int i = 0; i < N; i++)
-		if (abs(args[i]) >= opts.ES_halfwidth) ker[i] = 0.0;
-}
-
-static inline void eval_kernel_vec_Horner(FLT* ker, const FLT x, const int w,
-	const spread_opts& opts)
-	/* Fill ker[] with Horner piecewise poly approx to [-w/2,w/2] ES kernel eval at
-	   x_j = x + j,  for j=0,..,w-1.  Thus x in [-w/2,-w/2+1].   w is aka ns.
-	   This is the current evaluation method, since it's faster (except i7 w=16).
-	   Two upsampfacs implemented. Params must match ref formula. Barnett 4/24/18 */
-{
-	if (!(opts.flags & TF_OMIT_EVALUATE_KERNEL)) {
-		FLT z = 2 * x + w - 1.0;         // scale so local grid offset z in [-1,1]
-		// insert the auto-generated code which expects z, w args, writes to ker...
-		if (opts.upsampfac == 2.0) {     // floating point equality is fine here
-#include "ker_horner_allw_loop.c"
-		}
-		else if (opts.upsampfac == 1.25) {
-#include "ker_lowupsampfac_horner_allw_loop.c"
-		}
-		else
-			fprintf(stderr, "%s: unknown upsampfac, failed!\n", __func__);
-	}
-}
-
-void evaluate_kernel(FLT* kernel_vals, FLT* x, const BIGINT begin, const BIGINT end, const spread_opts& opts)
-{
-	int ns = opts.nspread; // kernel width
-	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
-
-	if (opts.kerevalmeth == 0) {
-		alignas(64) FLT kernel_args[MAX_NSPREAD];
-
-		for (BIGINT i = begin; i < end; i++)
-		{
-			set_kernel_args(kernel_args, x[i], opts);
-			evaluate_kernel_vector(kernel_vals + i * nsPadded, kernel_args, opts, ns);
-		}
-	}
-	else {
-		eval_kernel_bulk_Horner(kernel_vals + begin * nsPadded, x + begin, ns, end - begin, opts);
-	}
+		return exp(opts.ES_beta * sqrt(T(1.0) - opts.ES_c * x * x));
 }
 

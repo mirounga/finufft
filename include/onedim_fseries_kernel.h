@@ -6,6 +6,7 @@
 extern "C" {
 #include "../contrib/legendre_rule_fast.h"
 }
+#include <eval_kernel.h>
 
 #include <tbb/tbb.h>
 #include <immintrin.h>
@@ -86,7 +87,7 @@ inline void onedim_fseries_kernel<double>(BIGINT nf, double* fwkerhalf, spread_o
     std::complex<double> a[MAX_NQUAD];
     for (int n = 0; n < q; ++n) {               // set up nodes z_n and vals f_n
         z[n] *= J2;                         // rescale nodes
-        f[n] = J2 * (double)w[n] * evaluate_kernel((double)z[n], opts); // vals & quadr wei
+        f[n] = J2 * (double)w[n] * evaluate_kernel<double>((double)z[n], opts); // vals & quadr wei
         a[n] = exp(std::complex<double>(0.0, 2.0 * PI * (double)(nf / 2 - z[n]) / (double)nf));  // phase winding rates
     }
     BIGINT nout = nf / 2 + 1;                   // how many values we're writing to
@@ -272,7 +273,7 @@ inline void onedim_fseries_kernel<float>(BIGINT nf, float* fwkerhalf, spread_opt
     std::complex<float> a[MAX_NQUAD];
     for (int n = 0; n < q; ++n) {               // set up nodes z_n and vals f_n
         z[n] *= J2;                         // rescale nodes
-        f[n] = J2 * (float)w[n] * evaluate_kernel((float)z[n], opts); // vals & quadr wei
+        f[n] = J2 * (float)w[n] * evaluate_kernel<float>((float)z[n], opts); // vals & quadr wei
         a[n] = exp(std::complex<float>(0.0, 2.0 * PI * (float)(nf / 2 - z[n]) / (float)nf));  // phase winding rates
     }
     BIGINT nout = nf / 2 + 1;                   // how many values we're writing to

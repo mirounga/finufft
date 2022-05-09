@@ -41,9 +41,6 @@ int spreadinterpSorted(BIGINT* sort_indices,BIGINT N1, BIGINT N2, BIGINT N3,
 		      FLT *data_uniform,BIGINT M, FLT *kx, FLT *ky, FLT *kz,
 		      FLT *data_nonuniform, spread_opts opts, int did_sort);
 
-FLT evaluate_kernel(FLT x, const spread_opts& opts);
-void evaluate_kernel(FLT* kernel_vals, FLT* x, const BIGINT begin, const BIGINT end, const spread_opts& opts);
-
 int setup_spreader(spread_opts &opts,FLT eps,double upsampfac,int kerevalmeth, int debug, int showwarn, int dim);
 void get_subgrid(BIGINT& offset, BIGINT& size, BIGINT* idx, BIGINT M, int ns);
 
