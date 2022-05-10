@@ -1,7 +1,22 @@
 #ifndef INTERP_H
 #define INTERP_H
 
+#include <stdlib.h>
+#include <vector>
+#include <math.h>
+#include <stdio.h>
+
+#include <spreadinterp.h>
+#include <defs.h>
+#include <utils.h>
+#include <utils_precindep.h>
+
 #include <immintrin.h>
+#include <foldrescale.h>
+#include <eval_kernel.h>
+
+#include <tbb/tbb.h>
+#include <tbb/scalable_allocator.h>
 
 template<class T>
 void interp_line(BIGINT* sort_indices, T* data_nonuniform, T* du_padded,
@@ -2025,5 +2040,230 @@ inline void interp_cube<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 	}
 }
 #endif
+
+static inline void padData_1d(FLT* data, FLT* data_padded, BIGINT N1) {
+	std::copy(data, data + 2 * N1, data_padded + 2 * MAX_NSPREAD);
+	std::copy(data, data + 2 * MAX_NSPREAD, data_padded + 2 * (N1 + MAX_NSPREAD));
+	std::copy(data + 2 * (N1 - MAX_NSPREAD), data + 2 * N1, data_padded);
+}
+
+static inline void padData_2d(FLT* data, FLT* data_padded, BIGINT N1, BIGINT N2) {
+	BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
+	for (BIGINT j = 0; j < N2; j++) {
+		padData_1d(data + 2 * N1 * j, data_padded + 2 * paddedN1 * (j + MAX_NSPREAD), N1);
+	}
+	std::copy(data_padded + 2 * paddedN1 * N2, data_padded + 2 * paddedN1 * (N2 + MAX_NSPREAD), data_padded);
+	std::copy(data_padded + 2 * paddedN1 * MAX_NSPREAD, data_padded + 4 * paddedN1 * MAX_NSPREAD, data_padded + 2 * paddedN1 * (N2 + MAX_NSPREAD));
+}
+
+static inline void padData_3d(FLT* data, FLT* data_padded, BIGINT N1, BIGINT N2, BIGINT N3) {
+	BIGINT paddedN1 = N1 + 2 * MAX_NSPREAD;
+	BIGINT paddedN2 = N2 + 2 * MAX_NSPREAD;
+	for (BIGINT k = 0; k < N3; k++) {
+		padData_2d(data + 2 * N1 * N2 * k, data_padded + 2 * paddedN1 * paddedN2 * (k + MAX_NSPREAD), N1, N2);
+	}
+	std::copy(data_padded + 2 * paddedN1 * paddedN2 * N3, data_padded + 2 * paddedN1 * paddedN2 * (N3 + MAX_NSPREAD), data_padded);
+	std::copy(data_padded + 2 * paddedN1 * paddedN2 * MAX_NSPREAD, data_padded + 4 * paddedN1 * paddedN2 * MAX_NSPREAD, data_padded + 2 * paddedN1 * paddedN2 * (N3 + MAX_NSPREAD));
+}
+
+void combined_eval_interp_1d(BIGINT* sort_indices, FLT* data_nonuniform, FLT* du_padded,
+	FLT* x1,
+	BIGINT* i1,
+	BIGINT N1, BIGINT M,
+	BIGINT begin, BIGINT end, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)scalable_aligned_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, M, opts);
+
+
+	interp_line<FLT>(sort_indices, data_nonuniform, du_padded,
+		kernel_vals1,
+		i1,
+		N1,
+		ns, M);
+
+	scalable_aligned_free(kernel_vals1);
+}
+
+void combined_eval_interp_2d(BIGINT* sort_indices, FLT* data_nonuniform, FLT* du_padded,
+	FLT* x1, FLT* x2,
+	BIGINT* i1, BIGINT* i2,
+	BIGINT N1, BIGINT N2, BIGINT M,
+	BIGINT begin, BIGINT end, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)scalable_aligned_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals2 = (FLT*)scalable_aligned_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, M, opts);
+	evaluate_kernel(kernel_vals2, x2, M, opts);
+
+
+	interp_square<FLT>(sort_indices, data_nonuniform, du_padded,
+		kernel_vals1, kernel_vals2,
+		i1, i2,
+		N1, N2,
+		ns, M);
+
+	scalable_aligned_free(kernel_vals2);
+	scalable_aligned_free(kernel_vals1);
+}
+
+void combined_eval_interp_3d(BIGINT* sort_indices, FLT* data_nonuniform, FLT* du_padded,
+	FLT* x1, FLT* x2, FLT* x3,
+	BIGINT* i1, BIGINT* i2, BIGINT* i3,
+	BIGINT N1, BIGINT N2, BIGINT N3, BIGINT M,
+	BIGINT begin, BIGINT end, const spread_opts& opts)
+{
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+
+	FLT* kernel_vals1 = (FLT*)scalable_aligned_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals2 = (FLT*)scalable_aligned_malloc(nsPadded * M * sizeof(FLT), 64);
+	FLT* kernel_vals3 = (FLT*)scalable_aligned_malloc(nsPadded * M * sizeof(FLT), 64);
+
+	evaluate_kernel(kernel_vals1, x1, M, opts);
+	evaluate_kernel(kernel_vals2, x2, M, opts);
+	evaluate_kernel(kernel_vals3, x3, M, opts);
+
+
+	interp_cube<FLT>(sort_indices, data_nonuniform, du_padded,
+		kernel_vals1, kernel_vals2, kernel_vals3,
+		i1, i2, i3,
+		N1, N2, N3,
+		ns, M);
+
+	scalable_aligned_free(kernel_vals3);
+	scalable_aligned_free(kernel_vals2);
+	scalable_aligned_free(kernel_vals1);
+}
+
+// --------------------------------------------------------------------------
+int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
+	FLT* data_uniform, BIGINT M, FLT* kx, FLT* ky, FLT* kz,
+	FLT* data_nonuniform, const spread_opts& opts, int did_sort)
+	// Interpolate to NU pts in sorted order from a uniform grid.
+	// See spreadinterp() for doc.
+{
+	CNTime timer;
+	int ndims = ndims_from_Ns(N1, N2, N3);
+
+	int ns = opts.nspread;          // abbrev. for w, kernel width
+	FLT ns2 = (FLT)ns / 2;          // half spread width, used as stencil shift
+	int nthr = MY_OMP_GET_MAX_THREADS();   // # threads to use to interp
+	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
+	if (opts.nthreads > 0)
+		nthr = std::min<int>(nthr, opts.nthreads);      // user override up to max avail
+	if (opts.debug)
+		printf("\tinterp %dD (M=%lld; N1=%lld,N2=%lld,N3=%lld; pir=%d), nthr=%d\n", ndims, (long long)M, (long long)N1, (long long)N2, (long long)N3, opts.pirange, nthr);
+
+	timer.start();
+
+	BIGINT paddedN = 1, paddedN1, paddedN2, paddedN3;
+	switch (ndims) {
+	case 3:
+		paddedN3 = N3 + 2 * MAX_NSPREAD;
+		paddedN *= paddedN3;
+		// fall through
+	case 2:
+		paddedN2 = N2 + 2 * MAX_NSPREAD;
+		paddedN *= paddedN2;
+		// fall through
+	case 1:
+		paddedN1 = N1 + 2 * MAX_NSPREAD;
+		paddedN *= paddedN1;
+		break;
+	}
+
+	FLT* du_padded = (FLT*)malloc(2 * sizeof(FLT) * paddedN);
+
+	// eval kernel values patch and use to interpolate from uniform data...
+	if (!(opts.flags & TF_OMIT_SPREADING)) {
+		switch (ndims) {
+		case 1:
+			padData_1d(data_uniform, du_padded, N1);
+
+			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
+				[&](const tbb::blocked_range<BIGINT>& r) {
+					BIGINT* i1 = (BIGINT*)scalable_aligned_malloc(sizeof(BIGINT) * r.size(), 64);
+					FLT* x1 = (FLT*)scalable_aligned_malloc(sizeof(FLT) * r.size(), 64);
+
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, r.size(), opts);
+
+					combined_eval_interp_1d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD,
+						x1,
+						i1,
+						N1, r.size(),
+						r.begin(), r.end(), opts);
+
+					scalable_aligned_free(x1);
+					scalable_aligned_free(i1);
+				});
+			break;
+		case 2:
+			padData_2d(data_uniform, du_padded, N1, N2);
+
+			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
+				[&](const tbb::blocked_range<BIGINT>& r) {
+					BIGINT* i1 = (BIGINT*)scalable_aligned_malloc(sizeof(BIGINT) * r.size(), 64);
+					BIGINT* i2 = (BIGINT*)scalable_aligned_malloc(sizeof(BIGINT) * r.size(), 64);
+					FLT* x1 = (FLT*)scalable_aligned_malloc(sizeof(FLT) * r.size(), 64);
+					FLT* x2 = (FLT*)scalable_aligned_malloc(sizeof(FLT) * r.size(), 64);
+
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, r.size(), opts);
+
+					combined_eval_interp_2d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 + 1),
+						x1, x2,
+						i1, i2,
+						N1, N2, r.size(),
+						r.begin(), r.end(), opts);
+
+					scalable_aligned_free(x1); scalable_aligned_free(x2);
+					scalable_aligned_free(i1); scalable_aligned_free(i2);
+				});
+			break;
+		case 3:
+			padData_3d(data_uniform, du_padded, N1, N2, N3);
+
+			tbb::parallel_for(tbb::blocked_range<BIGINT>(0, M, 10000),
+				[&](const tbb::blocked_range<BIGINT>& r) {
+					BIGINT* i1 = (BIGINT*)scalable_aligned_malloc(sizeof(BIGINT) * r.size(), 64);
+					BIGINT* i2 = (BIGINT*)scalable_aligned_malloc(sizeof(BIGINT) * r.size(), 64);
+					BIGINT* i3 = (BIGINT*)scalable_aligned_malloc(sizeof(BIGINT) * r.size(), 64);
+					FLT* x1 = (FLT*)scalable_aligned_malloc(sizeof(FLT) * r.size(), 64);
+					FLT* x2 = (FLT*)scalable_aligned_malloc(sizeof(FLT) * r.size(), 64);
+					FLT* x3 = (FLT*)scalable_aligned_malloc(sizeof(FLT) * r.size(), 64);
+
+					foldrescale(sort_indices + r.begin(), kx, i1, x1, N1, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), ky, i2, x2, N2, r.size(), opts);
+					foldrescale(sort_indices + r.begin(), kz, i3, x3, N3, r.size(), opts);
+
+					combined_eval_interp_3d(sort_indices + r.begin(), data_nonuniform, du_padded + 2 * MAX_NSPREAD * (paddedN1 * paddedN2 + paddedN1 + 1),
+						x1, x2, x3,
+						i1, i2, i3,
+						N1, N2, N3, r.size(),
+						r.begin(), r.end(), opts);
+
+					scalable_aligned_free(x1); scalable_aligned_free(x2); scalable_aligned_free(x3);
+					scalable_aligned_free(i1); scalable_aligned_free(i2); scalable_aligned_free(i3);
+				});
+			break;
+		default: //can't get here
+			break;
+		}
+	}
+
+	free(du_padded);
+
+	if (opts.debug) printf("\tt2 spreading loop: \t%.3g s\n", timer.elapsedsec());
+	return 0;
+};
 
 #endif

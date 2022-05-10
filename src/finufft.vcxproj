@@ -88,9 +88,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="eval_kernel.cpp" />
     <ClCompile Include="finufft.cpp" />
+    <ClCompile Include="interp.cpp" />
     <ClCompile Include="simpleinterfaces.cpp" />
+    <ClCompile Include="spread.cpp" />
     <ClCompile Include="spreadinterp.cpp" />
     <ClCompile Include="subgrid.cpp" />
     <ClCompile Include="utils.cpp" />
@@ -98,10 +99,9 @@
     <ClCompile Include="$(SolutionDir)contrib/legendre_rule_fast.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\eval_kernel.h" />
     <ClInclude Include="..\include\foldrescale.h" />
-    <ClInclude Include="..\include\interp.h" />
     <ClInclude Include="..\include\onedim_fseries_kernel.h" />
-    <ClInclude Include="..\include\spread.h" />
     <ClInclude Include="..\include\spreadinterp.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

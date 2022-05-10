@@ -2,6 +2,7 @@
 #define FOLDRESCALE_H
 
 #include <cassert>
+#include <immintrin.h>
 
 /* local NU coord fold+rescale macro: does the following affine transform to x:
 	 when p=true:   map [-3pi,-pi) and [-pi,pi) and [pi,3pi)    each to [0,N)
@@ -15,8 +16,8 @@
 template<class T>
 T FOLDRESCALE(T x, BIGINT N, int p) {
 	return (p ?
-		(x + (x >= -PI ? (x < PI ? PI : -PI) : 3 * PI)) * ((T)M_1_2PI * N) :
-		(x >= 0.0 ? (x < static_cast<T>(N) ? x : x - (T)N) : x + (T)N));
+		(x + (x >= T(- PI) ? (x < T(PI) ? T(PI) : T( - PI)) : T(3 * PI))) * (T(M_1_2PI * N)) :
+		(x >= T(0.0) ? (x < static_cast<T>(N) ? x : x - (T)N) : x + (T)N));
 }
 
 template<class T>
@@ -102,10 +103,10 @@ inline void foldrescale<double>(BIGINT* sort_indices, double* kx, BIGINT* idx, d
 		{
 			BIGINT si = sort_indices[i];
 
-			FLT xj = FOLDRESCALE(kx[si], N, 0);
+			double xj = FOLDRESCALE(kx[si], N, 0);
 
 			// coords (x,y,z), spread block corner index (i1,i2,i3) of current NU targ
-			FLT c = std::ceil(xj - ns2); // leftmost grid index
+			double c = std::ceil(xj - ns2); // leftmost grid index
 
 			// shift of ker center, in [-w/2,-w/2+1]
 			x[i] = c - xj;
@@ -217,10 +218,10 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 		{
 			BIGINT si = sort_indices[i];
 
-			FLT xj = FOLDRESCALE(kx[si], N, 0);
+			float xj = FOLDRESCALE(kx[si], N, 0);
 
 			// coords (x,y,z), spread block corner index (i1,i2,i3) of current NU targ
-			FLT c = std::ceil(xj - ns2); // leftmost grid index
+			float c = std::ceil(xj - ns2); // leftmost grid index
 
 			// shift of ker center, in [-w/2,-w/2+1]
 			x[i] = c - xj;
@@ -229,10 +230,10 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 		}
 	}
 	else {
-		__m256 _plus_pi = _mm256_set1_ps(M_PI);
-		__m256 _minus_pi = _mm256_set1_ps(-M_PI);
-		__m256 _three_pi = _mm256_set1_ps(3.0 * M_PI);
-		__m256 _n_two_pi = _mm256_set1_ps(M_1_2PI * N);
+		__m256 _plus_pi = _mm256_set1_ps(static_cast<float>(M_PI));
+		__m256 _minus_pi = _mm256_set1_ps(static_cast<float>(-M_PI));
+		__m256 _three_pi = _mm256_set1_ps(static_cast<float>(3.0 * M_PI));
+		__m256 _n_two_pi = _mm256_set1_ps(static_cast<float>(M_1_2PI * N));
 		__m256 _ns2 = _mm256_set1_ps(ns2);
 
 		BIGINT size8 = size & ~0x07;
@@ -266,10 +267,10 @@ inline void foldrescale<float>(BIGINT* sort_indices, float* kx, BIGINT* idx, flo
 		{ 
 			BIGINT si = sort_indices[i];
 
-			double xj = FOLDRESCALE(kx[si], N, -1);
+			float xj = FOLDRESCALE(kx[si], N, -1);
 
 			// coords (x,y,z), spread block corner index (i1,i2,i3) of current NU targ
-			double c = std::ceil(xj - ns2); // leftmost grid index
+			float c = std::ceil(xj - ns2); // leftmost grid index
 
 			// shift of ker center, in [-w/2,-w/2+1]
 			x[i] = c - xj;

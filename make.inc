@@ -1,2 +1,2 @@
-CFLAGS = -O3 -funroll-loops -march=x86-64 -mtune=generic -mavx2 -mfma -fcx-limited-range
+CFLAGS = -O3 -funroll-loops -march=skylake-avx512 -mtune=generic -mavx512f -mfma -fcx-limited-range -ggdb
 CXXFLAGS = $(CFLAGS)

@@ -88,7 +88,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\eval_kernel.cpp" />
+    <ClCompile Include="..\src\interp.cpp" />
+    <ClCompile Include="..\src\spread.cpp" />
     <ClCompile Include="..\src\spreadinterp.cpp" />
     <ClCompile Include="..\src\subgrid.cpp" />
     <ClCompile Include="..\src\utils.cpp" />

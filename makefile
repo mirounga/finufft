@@ -15,8 +15,8 @@
 # Windows compatibility, jonas-kr, Sep '20.
 
 # Compiler (CXX), and linking from C, fortran. We use GCC by default...
-CXX = g++
-CC = gcc
+CXX = g++-11
+CC = gcc-11
 FC = gfortran
 CLINK = -lstdc++
 FLINK = $(CLINK)
@@ -35,7 +35,7 @@ CXXFLAGS := $(CFLAGS) $(CXXFLAGS)
 FFTWNAME = fftw3
 # linux default is fftw3_omp, since 10% faster than fftw3_threads...
 FFTWOMPSUFFIX = omp
-LIBS := -L${MKLROOT}/lib/intel64 -ltbb -lm
+LIBS := -L${MKLROOT}/lib/intel64 -ltbb -ltbbmalloc -lm
 # multithreading for GCC: C++/C/Fortran, MATLAB, and octave (ICC differs)...
 OMPFLAGS = -fopenmp
 OMPLIBS = -lgomp
@@ -101,7 +101,7 @@ ABSDYNLIB = $(FINUFFT)$(DYNLIB)
 
 # spreader is subset of the library with self-contained testing, hence own objs:
 # double-prec spreader object files that also need single precision...
-SOBJS = src/spreadinterp.o src/eval_kernel.o src/utils.o
+SOBJS = src/spreadinterp.o src/spread.o src/interp.o src/utils.o
 # their single-prec versions
 SOBJSF = $(SOBJS:%.o=%_32.o)
 # precision-dependent spreader object files (compiled & linked only once)...

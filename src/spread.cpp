@@ -1,8 +1,12 @@
 #ifndef SPREAD_H
 #define SPREAD_H
 
+#include <stdlib.h>
+#include <vector>
+#include <math.h>
+#include <stdio.h>
+
 #include <spreadinterp.h>
-#include <dataTypes.h>
 #include <defs.h>
 #include <utils.h>
 #include <utils_precindep.h>
@@ -11,17 +15,8 @@
 #include <foldrescale.h>
 #include <eval_kernel.h>
 
-#include <stdlib.h>
-#include <vector>
-#include <math.h>
-#include <stdio.h>
-
 #include <tbb/tbb.h>
 #include <tbb/scalable_allocator.h>
-
-#ifndef min
-#define min(a,b)            (((a) < (b)) ? (a) : (b))
-#endif
 
 // declarations of purely internal functions...
 void add_wrapped_subgrid(BIGINT offset1, BIGINT offset2, BIGINT offset3,
@@ -1878,21 +1873,10 @@ void combined_eval_spread_3d(BIGINT* sort_indices,
 	scalable_aligned_free(kernel_vals1);
 }
 
-static int ndims_from_Ns(BIGINT N1, BIGINT N2, BIGINT N3)
-/* rule for getting number of spreading dimensions from the list of Ns per dim.
-   Split out, Barnett 7/26/18
-*/
-{
-	int ndims = 1;                // decide ndims: 1,2 or 3
-	if (N2 > 1) ++ndims;
-	if (N3 > 1) ++ndims;
-	return ndims;
-}
-
 // --------------------------------------------------------------------------
 int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 	FLT* data_uniform, BIGINT M, FLT* kx, FLT* ky, FLT* kz,
-	FLT* data_nonuniform, spread_opts opts, int did_sort)
+	FLT* data_nonuniform, const spread_opts& opts, int did_sort)
 	// Spread NU pts in sorted order to a uniform grid. See spreadinterp() for doc.
 {
 	CNTime timer;
@@ -1903,7 +1887,7 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 	int nsPadded = 4 * (1 + (ns - 1) / 4); // pad ns to mult of 4
 	int nthr = MY_OMP_GET_MAX_THREADS();  // # threads to use to spread
 	if (opts.nthreads > 0)
-		nthr = min(nthr, opts.nthreads);     // user override up to max avail
+		nthr = std::min<int>(nthr, opts.nthreads);     // user override up to max avail
 	if (opts.debug)
 		printf("\tspread %dD (M=%lld; N1=%lld,N2=%lld,N3=%lld; pir=%d), nthr=%d\n", ndims, (long long)M, (long long)N1, (long long)N2, (long long)N3, opts.pirange, nthr);
 
@@ -1928,7 +1912,7 @@ int spreadSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 	else {           // ------- Fancy multi-core blocked t1 spreading ----
 					// Splits sorted inds (jfm's advanced2), could double RAM.
    // choose nb (# subprobs) via used nthreads:
-		BIGINT nb = min((BIGINT)nthr, M);         // simply split one subprob per thr...
+		BIGINT nb = std::min<BIGINT>((BIGINT)nthr, M);         // simply split one subprob per thr...
 		if (nb * (BIGINT)opts.max_subproblem_size < M) {  // ...or more subprobs to cap size
 			nb = 1 + (M - 1) / opts.max_subproblem_size;  // int div does ceil(M/opts.max_subproblem_size)
 			if (opts.debug) printf("\tcapping subproblem sizes to max of %d\n", opts.max_subproblem_size);
