@@ -26,7 +26,7 @@ PYTHON = python3
 # Notes: 1) -Ofast breaks isfinite() & isnan(), so use -O3 which now is as fast
 #        2) -fcx-limited-range for fortran-speed complex arith in C++
 #        3) we use simply-expanded (:=) makefile variables, otherwise confusing
-CFLAGS := -O3 -funroll-loops -march=native -fcx-limited-range $(CFLAGS)
+CFLAGS := -DMKL_ILP64 -O3 -funroll-loops -march=native -fcx-limited-range $(CFLAGS)
 FFLAGS := $(CFLAGS) $(FFLAGS)
 CXXFLAGS := $(CFLAGS) $(CXXFLAGS)
 # put this in your make.inc if you have FFTW>=3.3.5 and want thread-safe use...
@@ -35,7 +35,7 @@ CXXFLAGS := $(CFLAGS) $(CXXFLAGS)
 FFTWNAME = fftw3
 # linux default is fftw3_omp, since 10% faster than fftw3_threads...
 FFTWOMPSUFFIX = omp
-LIBS := -L${MKLROOT}/lib/intel64 -ltbb -ltbbmalloc -lm
+LIBS := -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -ltbb -ltbbmalloc -lmkl_intel_ilp64 -lmkl_tbb_thread -lmkl_core -lpthread -lm -ldl
 # multithreading for GCC: C++/C/Fortran, MATLAB, and octave (ICC differs)...
 OMPFLAGS = -fopenmp
 OMPLIBS = -lgomp

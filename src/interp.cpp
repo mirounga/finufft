@@ -2,9 +2,10 @@
 #define INTERP_H
 
 #include <stdlib.h>
-#include <vector>
 #include <math.h>
 #include <stdio.h>
+#include <cassert>
+#include <vector>
 
 #include <spreadinterp.h>
 #include <defs.h>
@@ -259,6 +260,7 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 	__m512i _spreadhi = _mm512_set_epi32(15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8);
 
 	BIGINT size2 = size & ~0x01;
+	BIGINT size8 = size & ~0x07;
 
 	switch (nsPadded) {
 	case 4:
@@ -328,43 +330,69 @@ inline void interp_line<float>(BIGINT* sort_indices, float* data_nonuniform, flo
 		break;
 	case 8:
 		// Unrolled loop
-		for (BIGINT i = 0; i < size2; i += 2)
+		for (BIGINT i = 0; i < size8; i += 8)
 		{
-			float* pDu0 = du_padded + 2 * i1[i + 0];
-			float* pDu1 = du_padded + 2 * i1[i + 1];
+			__m512i _i1 = _mm512_slli_epi64(_mm512_load_epi64(i1 + i), 1);
+			__m256i _i1a = _mm512_castsi512_si256(_i1);
 
-			__m512 _k0 = _mm512_castps256_ps512(_mm256_load_ps(pKer + 0));
+			__m512 _k_ab = _mm512_load_ps(pKer + 0);
+			__m512 _k_cd = _mm512_load_ps(pKer + 16);
+			__m512 _k_ef = _mm512_load_ps(pKer + 32);
+			__m512 _k_gh = _mm512_load_ps(pKer + 48);
 
-			__m512 _kk0 = _mm512_permutexvar_ps(_spreadlo, _k0);
-			__m512 _du0 = _mm512_loadu_ps(pDu0 + 0);
+			__m512 _kk0 = _mm512_permutexvar_ps(_spreadlo, _k_ab);
+			__m512 _du0 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1a, 0));
+
 			__m512 _out0 = _mm512_mul_ps(_kk0, _du0);
 
-			__m512 _k1 = _mm512_castps256_ps512(_mm256_load_ps(pKer + 8));
-
-			__m512 _kk1 = _mm512_permutexvar_ps(_spreadlo, _k1);
-			__m512 _du1 = _mm512_loadu_ps(pDu1 + 0);
+			__m512 _kk1 = _mm512_permutexvar_ps(_spreadhi, _k_ab);
+			__m512 _du1 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1a, 1));
 			__m512 _out1 = _mm512_mul_ps(_kk1, _du1);
 
-			_out0 = _mm512_add_ps(_out0, _mm512_shuffle_f32x4(_out0, _out0, 0x8e));
-			_out1 = _mm512_add_ps(_out1, _mm512_shuffle_f32x4(_out1, _out1, 0x8e));
+			__m512 _kk2 = _mm512_permutexvar_ps(_spreadlo, _k_cd);
+			__m512 _du2 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1a, 2));
+			__m512 _out2 = _mm512_mul_ps(_kk2, _du2);
 
-			_out0 = _mm512_add_ps(_out0, _mm512_shuffle_f32x4(_out0, _out0, 0xb1));
-			_out1 = _mm512_add_ps(_out1, _mm512_shuffle_f32x4(_out1, _out1, 0xb1));
+			__m512 _kk3 = _mm512_permutexvar_ps(_spreadhi, _k_cd);
+			__m512 _du3 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1a, 3));
+			__m512 _out3 = _mm512_mul_ps(_kk3, _du3);
 
-			_out0 = _mm512_add_ps(_out0, _mm512_permute_ps(_out0, 0x8e));
-			_out1 = _mm512_add_ps(_out1, _mm512_permute_ps(_out1, 0x8e));
+			__m256i _i1b = _mm512_extracti64x4_epi64(_i1, 1);
 
-			// Copy result buffer to output array
-			BIGINT si0 = sort_indices[i + 0];
-			BIGINT si1 = sort_indices[i + 1];
+			__m512 _kk4 = _mm512_permutexvar_ps(_spreadlo, _k_ef);
+			__m512 _du4 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1b, 0));
+			__m512 _out4 = _mm512_mul_ps(_kk4, _du4);
 
-			_mm512_mask_storeu_ps(data_nonuniform + 2 * si0, 0x0003, _out0);
-			_mm512_mask_storeu_ps(data_nonuniform + 2 * si1, 0x0003, _out1);
+			__m512 _kk5 = _mm512_permutexvar_ps(_spreadhi, _k_ef);
+			__m512 _du5 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1b, 1));
+			__m512 _out5 = _mm512_mul_ps(_kk5, _du5);
 
-			pKer += 16;
+			__m512 _kk6 = _mm512_permutexvar_ps(_spreadlo, _k_gh);
+			__m512 _du6 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1b, 2));
+			__m512 _out6 = _mm512_mul_ps(_kk6, _du6);
+
+			__m512 _kk7 = _mm512_permutexvar_ps(_spreadhi, _k_gh);
+			__m512 _du7 = _mm512_loadu_ps(du_padded + _mm256_extract_epi64(_i1b, 3));
+			__m512 _out7 = _mm512_mul_ps(_kk7, _du7);
+
+			_out2 = _mm512_add_ps(_mm512_shuffle_f32x4(_out0, _out2, 0x44), _mm512_shuffle_f32x4(_out0, _out2, 0xee));
+			_out3 = _mm512_add_ps(_mm512_shuffle_f32x4(_out1, _out3, 0x44), _mm512_shuffle_f32x4(_out1, _out3, 0xee));
+			_out6 = _mm512_add_ps(_mm512_shuffle_f32x4(_out4, _out6, 0x44), _mm512_shuffle_f32x4(_out4, _out6, 0xee));
+			_out7 = _mm512_add_ps(_mm512_shuffle_f32x4(_out5, _out7, 0x44), _mm512_shuffle_f32x4(_out5, _out7, 0xee));
+
+			_out6 = _mm512_add_ps(_mm512_shuffle_f32x4(_out2, _out6, 0x88), _mm512_shuffle_f32x4(_out2, _out6, 0xdd));
+			_out7 = _mm512_add_ps(_mm512_shuffle_f32x4(_out3, _out7, 0x88), _mm512_shuffle_f32x4(_out3, _out7, 0xdd));
+
+			_out7 = _mm512_add_ps(_mm512_shuffle_ps(_out6, _out7, 0x44), _mm512_shuffle_ps(_out6, _out7, 0xee));
+
+			__m512i _si = _mm512_load_epi64(sort_indices + i);
+
+			_mm512_i64scatter_pd(data_nonuniform, _si, _mm512_castps_pd(_out7), 8);
+
+			pKer += 64;
 		}
 		// Short tail
-		for (BIGINT i = size2; i < size; i++)
+		for (BIGINT i = size8; i < size; i++)
 		{
 			float* pDu = du_padded + 2 * i1[i];
 
@@ -2181,7 +2209,7 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 		break;
 	}
 
-	FLT* du_padded = (FLT*)malloc(2 * sizeof(FLT) * paddedN);
+	FLT* du_padded = (FLT*)scalable_aligned_malloc(2 * sizeof(FLT) * paddedN, 64);
 
 	// eval kernel values patch and use to interpolate from uniform data...
 	if (!(opts.flags & TF_OMIT_SPREADING)) {
@@ -2260,7 +2288,7 @@ int interpSorted(BIGINT* sort_indices, BIGINT N1, BIGINT N2, BIGINT N3,
 		}
 	}
 
-	free(du_padded);
+	scalable_aligned_free(du_padded);
 
 	if (opts.debug) printf("\tt2 spreading loop: \t%.3g s\n", timer.elapsedsec());
 	return 0;
