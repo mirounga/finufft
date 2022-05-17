@@ -1115,16 +1115,8 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 		// Unrolled loop
 		for (BIGINT i = 0; i < size4; i += 4)
 		{
-			__m512 _x_ab = _mm512_load_ps(pKer1 + 0);
-			__m512 _x_cd = _mm512_load_ps(pKer1 + 16);
-
 			__m512 _y_ab = _mm512_load_ps(pKer2 + 0);
 			__m512 _y_cd = _mm512_load_ps(pKer2 + 16);
-
-			__m512 _kx0 = _mm512_permutexvar_ps(_spreadlo, _x_ab);
-			__m512 _kx1 = _mm512_permutexvar_ps(_spreadhi, _x_ab);
-			__m512 _kx2 = _mm512_permutexvar_ps(_spreadlo, _x_cd);
-			__m512 _kx3 = _mm512_permutexvar_ps(_spreadhi, _x_cd);
 
 			__m512 _out0 = _mm512_setzero_ps();
 			__m512 _out1 = _mm512_setzero_ps();
@@ -1149,20 +1141,15 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 				_idx_lo = _mm512_add_epi32(_idx_lo, _one);
 				_idx_hi = _mm512_add_epi32(_idx_hi, _one);
 
-				__m512 _ma0 = _mm512_mul_ps(_ky0, _kx0);
-				__m512 _ma1 = _mm512_mul_ps(_ky1, _kx1);
-				__m512 _ma2 = _mm512_mul_ps(_ky2, _kx2);
-				__m512 _ma3 = _mm512_mul_ps(_ky3, _kx3);
-
 				__m512 _du0 = _mm512_loadu_ps(pDu0);
 				__m512 _du1 = _mm512_loadu_ps(pDu1);
 				__m512 _du2 = _mm512_loadu_ps(pDu2);
 				__m512 _du3 = _mm512_loadu_ps(pDu3);
 
-				_out0 = _mm512_fmadd_ps(_ma0, _du0, _out0);
-				_out1 = _mm512_fmadd_ps(_ma1, _du1, _out1);
-				_out2 = _mm512_fmadd_ps(_ma2, _du2, _out2);
-				_out3 = _mm512_fmadd_ps(_ma3, _du3, _out3);
+				_out0 = _mm512_fmadd_ps(_ky0, _du0, _out0);
+				_out1 = _mm512_fmadd_ps(_ky1, _du1, _out1);
+				_out2 = _mm512_fmadd_ps(_ky2, _du2, _out2);
+				_out3 = _mm512_fmadd_ps(_ky3, _du3, _out3);
 
 				pDu0 += 2 * paddedN1;
 				pDu1 += 2 * paddedN1;
@@ -1170,31 +1157,32 @@ inline void interp_square<float>(BIGINT* sort_indices, float* data_nonuniform, f
 				pDu3 += 2 * paddedN1;
 			}
 
-			_out0 = _mm512_add_ps(_out0, _mm512_shuffle_f32x4(_out0, _out0, 0x8e));
-			_out1 = _mm512_add_ps(_out1, _mm512_shuffle_f32x4(_out1, _out1, 0x8e));
-			_out2 = _mm512_add_ps(_out2, _mm512_shuffle_f32x4(_out2, _out2, 0x8e));
-			_out3 = _mm512_add_ps(_out3, _mm512_shuffle_f32x4(_out3, _out3, 0x8e));
+			__m512 _x_ab = _mm512_load_ps(pKer1 + 0);
+			__m512 _x_cd = _mm512_load_ps(pKer1 + 16);
 
-			_out0 = _mm512_add_ps(_out0, _mm512_shuffle_f32x4(_out0, _out0, 0xb1));
-			_out1 = _mm512_add_ps(_out1, _mm512_shuffle_f32x4(_out1, _out1, 0xb1));
-			_out2 = _mm512_add_ps(_out2, _mm512_shuffle_f32x4(_out2, _out2, 0xb1));
-			_out3 = _mm512_add_ps(_out3, _mm512_shuffle_f32x4(_out3, _out3, 0xb1));
+			__m512 _kx0 = _mm512_permutexvar_ps(_spreadlo, _x_ab);
+			__m512 _kx1 = _mm512_permutexvar_ps(_spreadhi, _x_ab);
+			__m512 _kx2 = _mm512_permutexvar_ps(_spreadlo, _x_cd);
+			__m512 _kx3 = _mm512_permutexvar_ps(_spreadhi, _x_cd);
 
-			_out0 = _mm512_add_ps(_out0, _mm512_permute_ps(_out0, 0x8e));
-			_out1 = _mm512_add_ps(_out1, _mm512_permute_ps(_out1, 0x8e));
-			_out2 = _mm512_add_ps(_out2, _mm512_permute_ps(_out2, 0x8e));
-			_out3 = _mm512_add_ps(_out3, _mm512_permute_ps(_out3, 0x8e));
+			_out0 = _mm512_mul_ps(_kx0, _out0);
+			_out1 = _mm512_mul_ps(_kx1, _out1);
+			_out2 = _mm512_mul_ps(_kx2, _out2);
+			_out3 = _mm512_mul_ps(_kx3, _out3);
 
-			// Copy result buffer to output array
-			BIGINT si0 = sort_indices[i + 0];
-			BIGINT si1 = sort_indices[i + 1];
-			BIGINT si2 = sort_indices[i + 2];
-			BIGINT si3 = sort_indices[i + 3];
+			__m512 _acc2 = _mm512_add_ps(_mm512_shuffle_f32x4(_out0, _out2, 0x44), _mm512_shuffle_f32x4(_out0, _out2, 0xee));
+			__m512 _acc3 = _mm512_add_ps(_mm512_shuffle_f32x4(_out1, _out3, 0x44), _mm512_shuffle_f32x4(_out1, _out3, 0xee));
 
-			_mm512_mask_storeu_ps(data_nonuniform + 2 * si0, 0x0003, _out0);
-			_mm512_mask_storeu_ps(data_nonuniform + 2 * si1, 0x0003, _out1);
-			_mm512_mask_storeu_ps(data_nonuniform + 2 * si2, 0x0003, _out2);
-			_mm512_mask_storeu_ps(data_nonuniform + 2 * si3, 0x0003, _out3);
+			_acc3 = _mm512_add_ps(_mm512_shuffle_f32x4(_acc2, _acc3, 0x88), _mm512_shuffle_f32x4(_acc2, _acc3, 0xdd));
+
+			__m256 _acc0 = _mm512_castps512_ps256(_acc3);
+			__m256 _acc1 = _mm512_extractf32x8_ps(_acc3, 1);
+
+			_acc0 = _mm256_add_ps(_mm256_shuffle_ps(_acc0, _acc1, 0x44), _mm256_shuffle_ps(_acc0, _acc1, 0xee));
+
+			__m256i _si = _mm256_loadu_epi64(sort_indices + i);
+
+			_mm256_i64scatter_pd(data_nonuniform, _si, _mm256_castps_pd(_acc0), 8);
 
 			pKer1 += 32;
 			pKer2 += 32;
